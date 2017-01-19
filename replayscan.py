@@ -89,6 +89,9 @@ def print_results(result, header_printed):
 
 if __name__ == "__main__":
     debug = False
+    sc2debug = os.environ.get("SC2DEBUG")
+    if sc2debug is not None:
+        debug = True
     header_printed = False
     match_stats = {
             "TvT": 0,

@@ -1,7 +1,9 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 import os
 import random
 import spawningtool.parser
-from sc2scan import populate_build_data
+from sc2scan import populate_build_data, map_process, is_korean_map
 
 
 def classify_matchup(result):
@@ -31,7 +33,7 @@ def print_results(result, header_printed):
         data = {}
 
         # Map
-        data['map'] = result['map']
+        data['map'] = map_process(unicode(result['map']), debug)
 
         # Matchup
         data['matchup'] = classify_matchup(result)
@@ -78,10 +80,16 @@ def print_results(result, header_printed):
 
 
 if __name__ == "__main__":
+    # Turn on debug from environment variable
     debug = False
     sc2debug = os.environ.get("SC2DEBUG")
     if sc2debug is not None:
         debug = True
+
+    # Limit to a small set of replays from environment variable
+    small_set = os.environ.get("SC2SMALL")
+    if small_set is not None:
+        small_set = int(small_set)
 
     header_printed = False
 
@@ -97,6 +105,7 @@ if __name__ == "__main__":
     count = 0
     replay_files = []
     error_replays = []
+    korean_maps = []
 
     # traverse root directory, and list directories as dirs and files as files
     for root, dirs, files in os.walk("replays"):
@@ -109,7 +118,7 @@ if __name__ == "__main__":
     # more variation in the first few seconds of running the program
     random.shuffle(replay_files)
 
-    for replay in replay_files:
+    for replay in replay_files[:small_set:]:
         count += 1
         try:
             f = spawningtool.parser.parse_replay(replay)
@@ -126,7 +135,13 @@ if __name__ == "__main__":
                 error_replays.append(replay)
                 continue
 
+            # Keep track of all the map names not translated to english
+            if is_korean_map(f['map']):
+                korean_maps.append(unicode(f['map']))
+
+            # Keep track of matchup stats(really don't need this anymore)
             match_stats[classify_matchup(f)] += 1
+
             header_printed = print_results(f, header_printed)
         except (spawningtool.exception.ReadError,
                 AttributeError,
@@ -135,6 +150,10 @@ if __name__ == "__main__":
                 IndexError):
             error_replays.append(replay)
             continue
-    print error_replays
-    print match_stats
-    print count
+    print "Error replays:", error_replays
+    print "Korean replays", 
+    for map in korean_maps:
+        print map,
+    print
+    print "match stats:", match_stats
+    print "total replays:", count, "error replays:", len(error_replays)

@@ -98,6 +98,9 @@ def map_process(map, debug):
     return " ".join(splits)
 
 
+# References
+# http://sc2.blizzard.cn/articles/1001/76078
+# http://tw.battle.net/sc2/zh/blog/20372511/2016-%E7%AC%AC-6-%E8%B3%BD%E5%AD%A3%E5%85%A8%E6%96%B0%E5%A4%A9%E6%A2%AF%E5%9C%B0%E5%9C%96-2016-11-17
 def unkorean_maps(map, debug):
     # from pdb import set_trace; set_trace()
     if debug:
@@ -109,6 +112,8 @@ def unkorean_maps(map, debug):
     if u'旋風之境 - 天梯版' in map:
         return 'Whirlwind'
     if u'紐科克管轄區 - 聯賽版' in map:
+        return 'Newkirk Precinct'
+    if u'新柯尔克辖区-锦标赛版' in map:
         return 'Newkirk Precinct'
     if u'殖民站 - 天梯版' in map:
         return 'Habitation Station'

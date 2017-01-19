@@ -72,16 +72,15 @@ def populate_build_data(player, debug):
 
 def first_army_unit(player, debug):
     data = {}
-    if debug:
-        print "debug: running first army unit"
-        for event in player['buildOrder']:
-            if not event['is_worker']:
-                if event['name'] in army_units:
+    for event in player['buildOrder']:
+        if not event['is_worker']:
+            if event['name'] in army_units:
+                if debug:
                     print "debug: First army unit found", event['name']
-                    data['first_army_unit'] = event['name']
-                    data['first_army_unit_supply'] = str(event['supply'])
-                    data['first_army_unit_time'] = event['time']
-                    break
+                data['first_army_unit'] = event['name']
+                data['first_army_unit_supply'] = str(event['supply'])
+                data['first_army_unit_time'] = event['time']
+                break
     return data
 
 

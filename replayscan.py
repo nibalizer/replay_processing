@@ -71,12 +71,14 @@ def print_results(result, header_printed):
 
         data.update(populate_build_data(result['players'][player], debug))
 
-        if not header_printed:
-            print ",".join(data.keys())
-            header_printed = True
-        print ",".join(data.values())
+    return data
 
-    return header_printed
+
+def dump(fieldnames, data):
+    orderd_data = []
+    for i in fieldnames:
+        orderd_data.append(data[i])
+    print ",".join(orderd_data)
 
 
 if __name__ == "__main__":
@@ -106,6 +108,7 @@ if __name__ == "__main__":
     replay_files = []
     error_replays = []
     korean_maps = []
+    results = []
 
     # traverse root directory, and list directories as dirs and files as files
     for root, dirs, files in os.walk("replays"):
@@ -117,6 +120,10 @@ if __name__ == "__main__":
     # Shuffle the replay files. This helps with local testing since we'll see
     # more variation in the first few seconds of running the program
     random.shuffle(replay_files)
+
+    fieldnames =[ 'map','first_army_unit_supply','Game Length(seconds)','baseBuild','region','Winner','first_army_unit','first_army_unit_time','player','game_category','build','unix_timestamp','player_race','matchup','opponent_race','opponent']
+
+    print ",".join(fieldnames)
 
     for replay in replay_files[:small_set:]:
         count += 1
@@ -142,7 +149,9 @@ if __name__ == "__main__":
             # Keep track of matchup stats(really don't need this anymore)
             match_stats[classify_matchup(f)] += 1
 
-            header_printed = print_results(f, header_printed)
+            data = print_results(f, header_printed)
+            dump(fieldnames, data)
+            results.append(data)
         except (spawningtool.exception.ReadError,
                 AttributeError,
                 UnicodeEncodeError,
@@ -150,10 +159,22 @@ if __name__ == "__main__":
                 IndexError):
             error_replays.append(replay)
             continue
+    print "match stats:", match_stats
+    print "total replays:", count, "error replays:", len(error_replays), "error percent:" , len(error_replays)/float(count)
     print "Error replays:", error_replays
     print "Korean replays", 
     for map in korean_maps:
-        print map,
+        print unicode(map),
     print
-    print "match stats:", match_stats
-    print "total replays:", count, "error replays:", len(error_replays)
+
+
+#    with open('starcraft_data.csv', 'w') as csvfile:
+#        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+#        writer.writeheader()
+#        for row in results:
+#            writer.writerow(row)
+
+
+
+
+

@@ -17,7 +17,6 @@ def classify_matchup(result):
     return matchup
 
 
-
 def populate_build_data(player):
     for event in player['buildOrder']:
         if not event['is_worker']:
@@ -85,31 +84,33 @@ def print_results(result, header_printed):
     return header_printed
 
 
-
 if __name__ == "__main__":
     debug = False
     sc2debug = os.environ.get("SC2DEBUG")
     if sc2debug is not None:
         debug = True
+
     header_printed = False
+
     match_stats = {
-            "TvT": 0,
-            "ZvZ": 0,
-            "PvP": 0,
-            "PvT": 0,
-            "TvZ": 0,
-            "PvZ": 0,
+        "TvT": 0,
+        "ZvZ": 0,
+        "PvP": 0,
+        "PvT": 0,
+        "TvZ": 0,
+        "PvZ": 0,
     }
 
     count = 0
     replay_files = []
+    error_replays = []
+
     # traverse root directory, and list directories as dirs and files as files
     for root, dirs, files in os.walk("replays"):
         path = root.split('/')
         for file in files:
             if file.endswith(".SC2Replay"):
                 replay_files.append(root + "/" + file)
-    error_replays = []
 
     for replay in replay_files:
         count += 1
@@ -127,9 +128,14 @@ if __name__ == "__main__":
             if len(f['players']) != 2:
                 error_replays.append(replay)
                 continue
+
             match_stats[classify_matchup(f)] += 1
             header_printed = print_results(f, header_printed)
-        except (spawningtool.exception.ReadError, AttributeError, UnicodeEncodeError, KeyError, IndexError):
+        except (spawningtool.exception.ReadError,
+                AttributeError,
+                UnicodeEncodeError,
+                KeyError,
+                IndexError):
             error_replays.append(replay)
             continue
     print error_replays

@@ -18,71 +18,16 @@ def classify_matchup(result):
     return matchup
 
 
-def write_builds(result):
-    matchup = classify_matchup(result)
-    races = []
-    for player in result['players'].values():
-        races.append(player['race'])
 
-    #print "races:",races
-    for player in result['players'].values():
-        local_races = []
-        for race in races:
-            local_races.append(race)
-        local_races.remove(player['race'])
-        # print "matchup is", player['race'], 'vs', local_races[0]
-        short_matchup =  player['race'][0] + "v" + local_races[0][0]
-        print "short matchup is", short_matchup
-        print "Play result: ", player['is_winner']
-        print('{} ({})'.format(player['name'], player['race']))
-        filename = "out/" + short_matchup + "/" + str(count)
-        f = open(filename, 'w')
-        f.write('{} ({})\n'.format(player['name'], player['race']))
-        f.write( "Short matchup: {0}\n".format(short_matchup))
-        f.write( "Game id: {0}\n".format(count))
-        f.write("Player won: {0}\n".format(player['is_winner']))
-        if player['clock_position'] is not None:
-            print('Start Position: {}:00'.format(player['clock_position']))
-            f.write("Start Position: {}:00\n".format(player['clock_position']))
-        for event in player['buildOrder']:
-            if not event['is_worker']:
-                print('{} {} {}{}'.format(
-                    event['supply'],
-                    event['time'],
-                    event['name'],
-                    ' (Chronoboosted)' if event['is_chronoboosted'] else ''
-                ))
-                f.write('{} {} {}{}\n'.format(
-                    event['supply'],
-                    event['time'],
-                    event['name'],
-                    ' (Chronoboosted)' if event['is_chronoboosted'] else ''
-                ))
-        f.close()
-
-        print('')
-
-def print_builds(result):
-    for player in result['players'].values():
-        print('{} ({})'.format(player['name'], player['race']))
-        if player['clock_position'] is not None:
-            print('Start Position: {}:00'.format(player['clock_position']))
-        print('')
-
-
-def print_units_lost(result):
-    for player in result['players'].values():
-        print('{} ({})'.format(player['name'], player['race']))
-        for event in player['unitsLost']:
-                print('{} {} killed by {}'.format(
-                    event['time'],
-                    event['name'],
-                    event['killer']
-                ))
-        print('')
-
-def populate_build_data(result):
-    pass
+def populate_build_data(player):
+    for event in player['buildOrder']:
+        if not event['is_worker']:
+            print('{} {} {}{}'.format(
+                event['supply'],
+                event['time'],
+                event['name'],
+                ' (Chronoboosted)' if event['is_chronoboosted'] else ''
+            ))
 
 
 def print_results(result, header_printed):
@@ -110,11 +55,19 @@ def print_results(result, header_printed):
         else:
             data['Winner'] = 'unknown'
 
+
+        # Clock Position
+        if result['players'][player]['clock_position'] is not None:
+            data['player_clock_position'] = result['players'][player]['clock_position']
+        if result['players'][opponent]['clock_position'] is not None:
+            data['opponent_clock_position'] = result['players'][opponent]['clock_position']
+
         data['Game Length(seconds)'] = str(result['frames'] / 16.)
         if not header_printed:
             print ",".join(data.keys())
             header_printed = True
         print ",".join(data.values())
+
     return header_printed
 
 

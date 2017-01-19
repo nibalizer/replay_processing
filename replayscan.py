@@ -1,5 +1,6 @@
 import os
 import spawningtool.parser
+from sc2scan import populate_build_data
 
 
 def classify_matchup(result):
@@ -15,17 +16,6 @@ def classify_matchup(result):
     if debug:
         print "debug: matchup is:", matchup
     return matchup
-
-
-def populate_build_data(player):
-    for event in player['buildOrder']:
-        if not event['is_worker']:
-            print('{} {} {}{}'.format(
-                event['supply'],
-                event['time'],
-                event['name'],
-                ' (Chronoboosted)' if event['is_chronoboosted'] else ''
-            ))
 
 
 def print_results(result, header_printed):
@@ -75,6 +65,8 @@ def print_results(result, header_printed):
         # The UTC time (according to the client NOT the server) thaat the game
         # was ended as represented by the Unix OS
         data['unix_timestamp'] = str(result['unix_timestamp'])
+
+        data.update(populate_build_data(result['players'][player], debug))
 
         if not header_printed:
             print ",".join(data.keys())

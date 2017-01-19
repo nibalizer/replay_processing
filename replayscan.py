@@ -44,6 +44,21 @@ def write_builds(result):
         if player['clock_position'] is not None:
             print('Start Position: {}:00'.format(player['clock_position']))
             f.write("Start Position: {}:00\n".format(player['clock_position']))
+        for event in player['buildOrder']:
+            if not event['is_worker']:
+                print('{} {} {}{}'.format(
+                    event['supply'],
+                    event['time'],
+                    event['name'],
+                    ' (Chronoboosted)' if event['is_chronoboosted'] else ''
+                ))
+                f.write('{} {} {}{}\n'.format(
+                    event['supply'],
+                    event['time'],
+                    event['name'],
+                    ' (Chronoboosted)' if event['is_chronoboosted'] else ''
+                ))
+        f.close()
 
         print('')
 
@@ -65,6 +80,9 @@ def print_units_lost(result):
                     event['killer']
                 ))
         print('')
+
+def populate_build_data(result):
+    pass
 
 
 def print_results(result, header_printed):

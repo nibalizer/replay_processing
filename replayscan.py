@@ -33,33 +33,32 @@ def print_results(result, header_printed):
     "print out a column of data"
     for player in [1, 2]:
         opponent = 2 if player == 1 else 1
-        # from pdb import set_trace; set_trace()
         if debug:
             print "debug: Player is ", player
             print "debug: Opponent is ", opponent
+
+        # Our main data hash
         data = {}
+
+        # Map
         data['map'] = result['map']
+
+        # Matchup
         data['matchup'] = classify_matchup(result)
-        # player_1, player_2 = result['players'][1]['name'], result['players'][2]['name']
-        # player_1_race, player_2_race = 
+
+        # Player, opponent, and race
         data['player'] = result['players'][player]['name']
         data['opponent'] = result['players'][opponent]['name']
         data['player_race'] = result['players'][player]['race']
         data['opponent_race'] = result['players'][opponent]['race']
 
+        # Winner
         if result['players'][player]['is_winner']:
             data['Winner'] = "True"
         elif result['players'][opponent]['is_winner']:
             data['Winner'] = "False"
         else:
             data['Winner'] = 'unknown'
-
-
-        # Clock Position
-        if result['players'][player]['clock_position'] is not None:
-            data['player_clock_position'] = result['players'][player]['clock_position']
-        if result['players'][opponent]['clock_position'] is not None:
-            data['opponent_clock_position'] = result['players'][opponent]['clock_position']
 
         # Game Length(seconds)
         data['Game Length(seconds)'] = str(result['frames'] / 16.)

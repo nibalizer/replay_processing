@@ -6,8 +6,11 @@ def classify_matchup(result):
     #print result['players']
     races = []
     for player in result['players'].values():
-        #print('{} ({})'.format(player['name'], player['race']))
+        if debug:
+            print('debug:{} ({})'.format(player['name'], player['race']))
         races.append(player['race'])
+
+    #from pdb import set_trace; set_trace()
     matchup = sorted(races)[0][0]
     matchup += "v"
     matchup += sorted(races)[1][0]
@@ -65,33 +68,41 @@ def print_units_lost(result):
 
 
 def print_results(result, header_printed):
-    #print header
-    data = {}
-    data['map'] = result['map']
-    data['matchup'] = classify_matchup(result)
-    #from pdb import set_trace; set_trace()
-    player_1, player_2 = result['players'][1]['name'], result['players'][2]['name']
-    player_1_race, player_2_race = result['players'][1]['race'], result['players'][2]['race']
+    "print out a column of data"
+    for player in [1, 2]:
+        opponent = 2 if player == 1 else 1
+        # from pdb import set_trace; set_trace()
+        if debug:
+            print "debug: Player is ", player
+            print "debug: Opponent is ", opponent
+        data = {}
+        data['map'] = result['map']
+        data['matchup'] = classify_matchup(result)
+        # player_1, player_2 = result['players'][1]['name'], result['players'][2]['name']
+        # player_1_race, player_2_race = 
+        data['player'] = result['players'][player]['name']
+        data['opponent'] = result['players'][opponent]['name']
+        data['player_race'] = result['players'][player]['race']
+        data['opponent_race'] = result['players'][opponent]['race']
 
-    if result['players'][1]['is_winner']:
-        data['Winner'] = result['players'][1]['name']
-    if result['players'][2]['is_winner']:
-        data['Winner'] = result['players'][2]['name']
+        if result['players'][player]['is_winner']:
+            data['Winner'] = "True"
+        elif result['players'][opponent]['is_winner']:
+            data['Winner'] = "False"
+        else:
+            data['Winner'] = 'unknown'
 
-    data['Player 1'] = player_1
-    data['Player 2'] = player_2
-    data['Player 1 race'] = player_1_race
-    data['Player 2 race'] = player_2_race
-    data['Game Length(seconds)'] = str(result['frames'] / 16.)
-    if not header_printed:
-        print ",".join(data.keys())
-        header_printed = True
-    print ",".join(data.values())
+        data['Game Length(seconds)'] = str(result['frames'] / 16.)
+        if not header_printed:
+            print ",".join(data.keys())
+            header_printed = True
+        print ",".join(data.values())
     return header_printed
 
 
 
 if __name__ == "__main__":
+    debug = False
     header_printed = False
     match_stats = {
             "TvT": 0,
@@ -118,9 +129,14 @@ if __name__ == "__main__":
         try:
             f = spawningtool.parser.parse_replay(replay)
             #print replay
+            if debug:
+                print "debug: number of players detected: ", len(f['players'])
+            if len(f['players']) != 2:
+                error_replays.append(replay)
+                continue
             match_stats[classify_matchup(f)] += 1
             header_printed = print_results(f, header_printed)
-        except (spawningtool.exception.ReadError, AttributeError, UnicodeEncodeError):
+        except (spawningtool.exception.ReadError, AttributeError, UnicodeEncodeError, KeyError, IndexError):
             #print replay
             error_replays.append(replay)
             continue

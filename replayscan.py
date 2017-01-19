@@ -3,18 +3,17 @@ import spawningtool.parser
 
 
 def classify_matchup(result):
-    #print result['players']
     races = []
     for player in result['players'].values():
         if debug:
             print('debug:{} ({})'.format(player['name'], player['race']))
         races.append(player['race'])
 
-    #from pdb import set_trace; set_trace()
     matchup = sorted(races)[0][0]
     matchup += "v"
     matchup += sorted(races)[1][0]
-    #print matchup
+    if debug:
+        print "debug: matchup is:", matchup
     return matchup
 
 
@@ -62,7 +61,23 @@ def print_results(result, header_printed):
         if result['players'][opponent]['clock_position'] is not None:
             data['opponent_clock_position'] = result['players'][opponent]['clock_position']
 
+        # Game Length(seconds)
         data['Game Length(seconds)'] = str(result['frames'] / 16.)
+
+        # Region(eu, kr, na)
+        data['region'] = result['region']
+
+        # Category (ladder, custom, etc)
+        data['game_category'] = result['category']
+
+        # StarCraft version information
+        data['build'] = str(result['build'])
+        data['baseBuild'] = str(result['baseBuild'])
+
+        # The UTC time (according to the client NOT the server) thaat the game
+        # was ended as represented by the Unix OS
+        data['unix_timestamp'] = str(result['unix_timestamp'])
+
         if not header_printed:
             print ",".join(data.keys())
             header_printed = True
@@ -92,23 +107,27 @@ if __name__ == "__main__":
         for file in files:
             if file.endswith(".SC2Replay"):
                 replay_files.append(root + "/" + file)
-    #print replay_files
     error_replays = []
 
     for replay in replay_files:
         count += 1
         try:
             f = spawningtool.parser.parse_replay(replay)
-            #print replay
             if debug:
                 print "debug: number of players detected: ", len(f['players'])
+
+            # We don't want any not 1v1 matches
+            if f['game_type'] != '1v1':
+                error_replays.append(replay)
+                continue
+
+            # We don't want any not 1v1 matches
             if len(f['players']) != 2:
                 error_replays.append(replay)
                 continue
             match_stats[classify_matchup(f)] += 1
             header_printed = print_results(f, header_printed)
         except (spawningtool.exception.ReadError, AttributeError, UnicodeEncodeError, KeyError, IndexError):
-            #print replay
             error_replays.append(replay)
             continue
     print error_replays

@@ -1,4 +1,5 @@
 import os
+import random
 import spawningtool.parser
 from sc2scan import populate_build_data
 
@@ -103,6 +104,10 @@ if __name__ == "__main__":
         for file in files:
             if file.endswith(".SC2Replay"):
                 replay_files.append(root + "/" + file)
+
+    # Shuffle the replay files. This helps with local testing since we'll see
+    # more variation in the first few seconds of running the program
+    random.shuffle(replay_files)
 
     for replay in replay_files:
         count += 1

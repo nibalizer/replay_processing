@@ -10,7 +10,7 @@ def classify_matchup(result):
     races = []
     for player in result['players'].values():
         if debug:
-            print('debug:{} ({})'.format(player['name'], player['race']))
+            print "debug:", player['name'], '(', player["race"], ')'
         races.append(player['race'])
 
     matchup = sorted(races)[0][0]
@@ -21,8 +21,9 @@ def classify_matchup(result):
     return matchup
 
 
-def print_results(result, header_printed):
+def print_results(result):
     "print out a column of data"
+    both_data = []
     for player in [1, 2]:
         opponent = 2 if player == 1 else 1
         if debug:
@@ -70,15 +71,19 @@ def print_results(result, header_printed):
         data['unix_timestamp'] = str(result['unix_timestamp'])
 
         data.update(populate_build_data(result['players'][player], debug))
+        both_data.append(data)
 
-    return data
+    return both_data
 
 
 def dump(fieldnames, data):
     orderd_data = []
-    for i in fieldnames:
-        orderd_data.append(data[i])
-    print ",".join(orderd_data)
+    try:
+        for i in fieldnames:
+            orderd_data.append(unicode(data[i]))
+        print ",".join(orderd_data)
+    except KeyError:
+        from pdb import set_trace; set_trace()
 
 
 if __name__ == "__main__":
@@ -93,7 +98,12 @@ if __name__ == "__main__":
     if small_set is not None:
         small_set = int(small_set)
 
-    header_printed = False
+    # If SC2REPLAYS is set, search that dir instead
+    sc2replays = os.environ.get("SC2REPLAYS")
+    if sc2replays is not None:
+        replay_dir = sc2replays
+    else:
+        replay_dir = 'replays'
 
     match_stats = {
         "TvT": 0,
@@ -111,7 +121,7 @@ if __name__ == "__main__":
     results = []
 
     # traverse root directory, and list directories as dirs and files as files
-    for root, dirs, files in os.walk("replays"):
+    for root, dirs, files in os.walk(replay_dir):
         path = root.split('/')
         for file in files:
             if file.endswith(".SC2Replay"):
@@ -121,7 +131,26 @@ if __name__ == "__main__":
     # more variation in the first few seconds of running the program
     random.shuffle(replay_files)
 
-    fieldnames =[ 'map','first_army_unit_supply','Game Length(seconds)','baseBuild','region','Winner','first_army_unit','first_army_unit_time','player','game_category','build','unix_timestamp','player_race','matchup','opponent_race','opponent']
+    fieldnames = ['map',
+                  'first_army_unit_supply',
+                  'Game Length(seconds)',
+                  'baseBuild',
+                  'region',
+                  'Winner',
+                  'first_army_unit',
+                  'first_army_unit_time',
+                  'player',
+                  'game_category',
+                  'build',
+                  'unix_timestamp',
+                  'player_race',
+                  'matchup',
+                  'opponent_race',
+                  'opponent',
+                  'Carriers count',
+                  'Carrier timing',
+                  'Carriers',
+                  'replay_file']
 
     print ",".join(fieldnames)
 
@@ -130,6 +159,7 @@ if __name__ == "__main__":
         try:
             f = spawningtool.parser.parse_replay(replay)
             if debug:
+                print "debug:", replay
                 print "debug: number of players detected: ", len(f['players'])
 
             # We don't want any not 1v1 matches
@@ -149,14 +179,17 @@ if __name__ == "__main__":
             # Keep track of matchup stats(really don't need this anymore)
             match_stats[classify_matchup(f)] += 1
 
-            data = print_results(f, header_printed)
-            dump(fieldnames, data)
-            results.append(data)
+            for player_side in print_results(f):
+                data = {}
+                data['replay_file'] = replay
+                data.update(player_side)
+                #results.append(data)
+                dump(fieldnames, data)
         except (spawningtool.exception.ReadError,
-                AttributeError,
                 UnicodeEncodeError,
+                IndexError,
                 KeyError,
-                IndexError):
+                AttributeError):
             error_replays.append(replay)
             continue
     print "match stats:", match_stats
@@ -166,15 +199,4 @@ if __name__ == "__main__":
     for map in korean_maps:
         print unicode(map),
     print
-
-
-#    with open('starcraft_data.csv', 'w') as csvfile:
-#        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-#        writer.writeheader()
-#        for row in results:
-#            writer.writerow(row)
-
-
-
-
 

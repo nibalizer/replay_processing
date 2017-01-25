@@ -51,6 +51,11 @@ army_units = ['Marine',
               'Overseer', ]
 
 
+def time_to_seconds(time):
+    minutes, seconds = time.split(':')
+    return str(60 * int(minutes) + int(seconds))
+
+
 def populate_build_data(player, debug):
     data = {}
     if debug and False:
@@ -65,12 +70,32 @@ def populate_build_data(player, debug):
                 ))
 
     data.update(first_army_unit(player, debug))
+    data.update(carriers_count(player, debug))
 
+    return data
+
+
+def carriers_count(player, debug):
+    data = {}
+    data['Carriers count'] = 0
+    data['Carrier timing'] = 0
+    data['Carriers'] = "False"
+    for event in player['buildOrder']:
+        if not event['is_worker']:
+            if event['name'] == 'Carrier':
+                data['Carriers'] = "True"
+                data['Carriers count'] += 1
+                if data['Carrier timing'] == 0:
+                    data['Carrier timing'] = time_to_seconds(event['time'])
+    data['Carriers count'] = str(data['Carriers count'])
     return data
 
 
 def first_army_unit(player, debug):
     data = {}
+    data['first_army_unit'] = None
+    data['first_army_unit_supply'] = None
+    data['first_army_unit_time'] = None
     for event in player['buildOrder']:
         if not event['is_worker']:
             if event['name'] in army_units:
@@ -78,7 +103,7 @@ def first_army_unit(player, debug):
                     print "debug: First army unit found", event['name']
                 data['first_army_unit'] = event['name']
                 data['first_army_unit_supply'] = str(event['supply'])
-                data['first_army_unit_time'] = event['time']
+                data['first_army_unit_time'] = time_to_seconds(event['time'])
                 break
     return data
 

@@ -42,7 +42,7 @@ example analytics
 -----------------
 
 
-![Example Chart](watson_analytics.jpg)
+![Example Chart](watson_analytics.png)
 
 
 

@@ -147,6 +147,7 @@ if __name__ == "__main__":
                   'matchup',
                   'opponent_race',
                   'opponent',
+                  'first_tech_path',
                   'Carriers count',
                   'Carrier timing',
                   'Carriers',

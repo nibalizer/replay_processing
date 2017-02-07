@@ -1,0 +1,2 @@
+-e https://github.com/ggtracker/sc2reader.git#egg=sc2reader
+-e https://github.com/StoicLoofah/spawningtool#egg=spawningtool

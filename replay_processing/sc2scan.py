@@ -50,6 +50,10 @@ army_units = ['Marine',
               'BroodLord',
               'Overseer', ]
 
+terran_mech_upgrades = ['TerranVehicleWeaponsLevel1',
+                        'TerranShipWeaponsLevel1',
+                        'TerranVehicleAndShipArmorsLevel1']
+
 tech_paths = ['Stargate',
               'TwilightCouncil',
               'RoboticsFacility',
@@ -178,6 +182,9 @@ def determine_tech_path(player, debug):
             if event['name'] in tech_paths:
                 if debug:
                     print "debug: First tech path found", event['name']
-                data['first_tech_path'] = event['name']
+                if event['name'] in terran_mech_upgrades:
+                    data['first_tech_path'] = 'Mech'
+                else:
+                    data['first_tech_path'] = event['name']
                 break
     return data

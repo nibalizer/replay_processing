@@ -1,5 +1,5 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+
+
 army_units = ['Marine',
               'Marauder',
               'Reaper',
@@ -71,27 +71,25 @@ def time_to_seconds(time):
     return str(60 * int(minutes) + int(seconds))
 
 
-def populate_build_data(player, debug):
+def populate_build_data(player, logger):
     data = {}
-    if debug and False:
+    if logger and False:
         for event in player['buildOrder']:
             if not event['is_worker']:
-                # from pdb import set_trace; set_trace()
-                print('debug: {} {} {}{}'.format(
-                    event['supply'],
-                    event['time'],
-                    event['name'],
-                    ' (Chronoboosted)' if event['is_chronoboosted'] else ''
-                ))
+                logger.debug('debug: {} {} {}{}'.format(
+                             event['supply'],
+                             event['time'],
+                             event['name'],
+                             ' (Chronoboosted)' if event['is_chronoboosted'] else ''))
 
-    data.update(first_army_unit(player, debug))
-    data.update(carriers_count(player, debug))
-    data.update(determine_tech_path(player, debug))
+    data.update(first_army_unit(player, logger))
+    data.update(carriers_count(player))
+    data.update(determine_tech_path(player, logger))
 
     return data
 
 
-def carriers_count(player, debug):
+def carriers_count(player):
     data = {}
     data['Carriers count'] = 0
     data['Carrier timing'] = 0
@@ -107,7 +105,7 @@ def carriers_count(player, debug):
     return data
 
 
-def first_army_unit(player, debug):
+def first_army_unit(player, logger):
     data = {}
     data['first_army_unit'] = None
     data['first_army_unit_supply'] = None
@@ -115,8 +113,7 @@ def first_army_unit(player, debug):
     for event in player['buildOrder']:
         if not event['is_worker']:
             if event['name'] in army_units:
-                if debug:
-                    print "debug: First army unit found", event['name']
+                logger.debug("debug: First army unit found", event['name'])
                 data['first_army_unit'] = event['name']
                 data['first_army_unit_supply'] = str(event['supply'])
                 data['first_army_unit_time'] = time_to_seconds(event['time'])
@@ -124,8 +121,8 @@ def first_army_unit(player, debug):
     return data
 
 
-def map_process(map, debug):
-    map = unkorean_maps(map, debug)
+def map_process(map, logger):
+    map = unkorean_maps(map, logger)
     splits = map.split(" ")
     if "LE" in splits:
         splits.remove("LE")
@@ -140,10 +137,9 @@ def map_process(map, debug):
 # References
 # http://sc2.blizzard.cn/articles/1001/76078
 # http://tw.battle.net/sc2/zh/blog/20372511/2016-%E7%AC%AC-6-%E8%B3%BD%E5%AD%A3%E5%85%A8%E6%96%B0%E5%A4%A9%E6%A2%AF%E5%9C%B0%E5%9C%96-2016-11-17
-def unkorean_maps(map, debug):
-    # from pdb import set_trace; set_trace()
-    if debug:
-        print "map", map
+def unkorean_maps(map, logger):
+    # TODO: Make a dict object with the translations
+    logger.debug("Map: {0}".format(map))
     if u'回聲 - 天梯版' in map:
         return 'Echo'
     if u'密林濕地 - 天梯版' in map:
@@ -160,8 +156,7 @@ def unkorean_maps(map, debug):
         return 'Vaani Research Station'
     if u'破曉黎明 - 天梯版' in map:
         return 'Daybreak'
-    if debug:
-        print "No match"
+    logger.debug("No match")
     return map
 
 
@@ -174,14 +169,13 @@ def is_korean_map(map):
     return korean
 
 
-def determine_tech_path(player, debug):
+def determine_tech_path(player, logger):
     data = {}
     data['first_tech_path'] = None
     for event in player['buildOrder']:
         if not event['is_worker']:
             if event['name'] in tech_paths:
-                if debug:
-                    print "debug: First tech path found", event['name']
+                logger.debug("debug: First tech path found", event['name'])
                 if event['name'] in terran_mech_upgrades:
                     data['first_tech_path'] = 'Mech'
                 else:

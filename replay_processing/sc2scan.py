@@ -50,6 +50,21 @@ army_units = ['Marine',
               'BroodLord',
               'Overseer', ]
 
+terran_mech_upgrades = ['TerranVehicleWeaponsLevel1',
+                        'TerranShipWeaponsLevel1',
+                        'TerranVehicleAndShipArmorsLevel1']
+
+tech_paths = ['Stargate',
+              'TwilightCouncil',
+              'RoboticsFacility',
+              'Stimpack',
+              'TerranVehicleWeaponsLevel1',
+              'TerranShipWeaponsLevel1',
+              'TerranVehicleAndShipArmorsLevel1',
+              'BanelingNest',
+              'Lair', # not perfect
+              'RoachWarren']
+
 
 def time_to_seconds(time):
     minutes, seconds = time.split(':')
@@ -69,6 +84,7 @@ def populate_build_data(player, logger):
 
     data.update(first_army_unit(player, logger))
     data.update(carriers_count(player))
+    data.update(determine_tech_path(player, logger))
 
     return data
 
@@ -151,3 +167,18 @@ def is_korean_map(map):
             korean = False
 
     return korean
+
+
+def determine_tech_path(player, logger):
+    data = {}
+    data['first_tech_path'] = None
+    for event in player['buildOrder']:
+        if not event['is_worker']:
+            if event['name'] in tech_paths:
+                logger.debug("debug: First tech path found", event['name'])
+                if event['name'] in terran_mech_upgrades:
+                    data['first_tech_path'] = 'Mech'
+                else:
+                    data['first_tech_path'] = event['name']
+                break
+    return data

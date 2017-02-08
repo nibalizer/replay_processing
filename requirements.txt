@@ -1,0 +1,2 @@
+-e git+https://github.com/ggtracker/sc2reader.git#egg=sc2reader
+-e git+https://github.com/StoicLoofah/spawningtool#egg=spawningtool

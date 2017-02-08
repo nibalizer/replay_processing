@@ -164,6 +164,10 @@ def parse_replays(root_dir, num_threads,
     error_replays = []
     match_stats = Counter()
     korean_replays = []
+
+    outfile.write(','.join(FIELD_NAMES))
+    outfile.write('\n')
+
     with ThreadPoolExecutor(max_workers=num_threads) as executor:
         future_to_replay = {}
         replay_files = glob.glob("{root_dir}/**/*.SC2Replay".format(root_dir=root_dir), recursive=True)

@@ -26,10 +26,13 @@ requirements
 
 arguments
 ---------
-#### --replay_folder (-R): Path to directory we want to pull replay data from
-#### --max_replays (-M): Maximum number of replay files to parse (should be int)
-#### --all_matches (-a) [NOT IMPLEMENTED YET]: if set, parses all replays not just 1v1 matchups
-#### --verbose (-v): Print all output if set
+--replay_folder (-R): Path to directory we want to pull replay data from
+
+--max_replays (-M): Maximum number of replay files to parse (should be int) 
+
+--all_matches (-a) [NOT IMPLEMENTED YET]: if set, parses all replays not just 1v1 matchups 
+
+--verbose (-v): Print all output if set 
 
 
 running

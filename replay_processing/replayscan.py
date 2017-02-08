@@ -86,7 +86,7 @@ def dump(fieldnames, data):
         from pdb import set_trace; set_trace()
 
 
-if __name__ == "__main__":
+def main():
     # Turn on debug from environment variable
     debug = False
     sc2debug = os.environ.get("SC2DEBUG")
@@ -201,3 +201,6 @@ if __name__ == "__main__":
         print unicode(map),
     print
 
+
+if __name__ == "__main__":
+    main()

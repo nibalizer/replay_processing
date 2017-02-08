@@ -2,6 +2,19 @@ sc2 replay processing
 =====================
 
 
+installation
+------------
+
+This package can be installed with pip as follows:
+
+::
+    git clone https://github.com/nibalizer/replay_processing
+    cd replay_processing
+    pip install -U replay_processing
+
+
+The use of a virtualenv is recommended.
+
 
 requirements
 ------------
@@ -16,10 +29,8 @@ running
 --------
 
 
-```shell
-
-time python replayscan.py | tee starcraft_data.csv
-```
+::
+    time replayscan | tee starcraft_data.csv
 
 
 run time

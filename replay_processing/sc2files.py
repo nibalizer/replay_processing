@@ -4,7 +4,7 @@ import traceback
 
 import spawningtool.parser
 import spawningtool.exception
-from sc2scan import is_korean_map, map_process, populate_build_data
+from replay_processing.sc2scan import is_korean_map, map_process, populate_build_data
 from collections import Counter
 
 

@@ -1,6 +1,6 @@
 
-from parseargs import parse_params
-from sc2files import parse_replays
+from replay_processing.parseargs import parse_params
+from replay_processing.sc2files import parse_replays
 
 
 def main():

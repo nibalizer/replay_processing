@@ -154,7 +154,7 @@ def worker(filename, all_replays, logger):
         return data, num_players, error_replay, korean, map_name, matchup
 
 
-def parse_replays(root_dir, logger=logging.getLogger("replayParser"), max_replays=None, all_replays=False):
+def parse_replays(root_dir, num_threads, logger=logging.getLogger("replayParser"), max_replays=None, all_replays=False):
     # Run our replay parsing in a thread pool executor with 5 workers.
     match_data = []
     count = 0
@@ -162,7 +162,7 @@ def parse_replays(root_dir, logger=logging.getLogger("replayParser"), max_replay
     error_replays = []
     match_stats = Counter()
     korean_replays = []
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    with ThreadPoolExecutor(max_workers=num_threads) as executor:
         future_to_replay = {}
         replay_files = glob.glob("{root_dir}/**/*.SC2Replay".format(root_dir=root_dir), recursive=True)
         replay_files = replay_files[:max_replays] if max_replays is not None else replay_files

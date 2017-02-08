@@ -9,10 +9,22 @@ def main():
     logger = params["logger"]
     # Parse replays using params
     logger.info("Parsing Replay Files")
-    match_data, count, errors, error_replays, match_stats, korean_replays = parse_replays(params["replay_dir"],
-                                                                                          params["threads"],
-                                                                                          max_replays=params["max_replays"],
-                                                                                          logger=logger)
+
+    output_path = params.get("output_path")
+    output_file = None
+    try:
+        if output_path is not None:
+            output_file = open(output_path, "w+")
+        ret = parse_replays(params["replay_dir"],
+                            params["threads"],
+                            max_replays=params.get("max_replays"),
+                            logger=logger,
+                            outfile=output_file)
+    finally:
+        if output_file is not None:
+            output_file.close
+
+    match_data, count, errors, error_replays, match_stats, korean_replays = ret
 
     logger.info("Match Stats: {0}".format({k: v for k, v in match_stats.items()}))
     logger.info("Total Replays: {0}".format(count))

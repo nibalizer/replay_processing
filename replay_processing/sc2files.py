@@ -1,15 +1,14 @@
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import glob
 import logging
+import sys
+import threading
 import traceback
 
 import spawningtool.parser
 import spawningtool.exception
 from replay_processing.sc2scan import is_korean_map, map_process, populate_build_data
 from collections import Counter
-
-
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
 
 FIELD_NAMES = ['map',
               'first_army_unit_supply',
@@ -95,13 +94,10 @@ def extract_player_data(result, player, logger, debug=False):
     return data
 
 
-def dump(data):
+def dump(data, outfile):
     # TODO: Fix this up
-    try:
-        print(",".join([str(data[field]) for field in FIELD_NAMES]))
-    except KeyError:
-        from pdb import set_trace
-        set_trace()
+    outfile.write(",".join([str(data[field]) for field in FIELD_NAMES]))
+    outfile.write("\n")
 
 
 def print_results(result, logger):
@@ -154,7 +150,13 @@ def worker(filename, all_replays, logger):
         return data, num_players, error_replay, korean, map_name, matchup
 
 
-def parse_replays(root_dir, num_threads, logger=logging.getLogger("replayParser"), max_replays=None, all_replays=False):
+def parse_replays(root_dir, num_threads,
+                  logger=logging.getLogger("replayParser"),
+                  max_replays=None, all_replays=False,
+                  outfile=None):
+
+    outfile = outfile or sys.stdout
+    dump_lock = threading.Lock()
     # Run our replay parsing in a thread pool executor with 5 workers.
     match_data = []
     count = 0
@@ -183,7 +185,8 @@ def parse_replays(root_dir, num_threads, logger=logging.getLogger("replayParser"
                 count += 1
                 for item in data["sides"]:
                     # TODO: Instead of this, should just do a full dump at the end and write a proper CSV file
-                    dump(item)
+                    with dump_lock:
+                        dump(item, outfile)
                 # Take data from futures and add to proper
                 match_data.append(data)
                 if in_korean:

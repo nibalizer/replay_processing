@@ -42,6 +42,8 @@ def parse_params():
     parser.add_argument("-v", "--verbose", help="Print all output if set, else only critical logging", action="store_true")
     parser.add_argument("-d", "--debug", help="Enable debugging from application", action="store_true")
     parser.add_argument("-a", "--all_matches", help="Only take into account 1v1 matchups", action="store_true")
+    parser.add_argument("-o", "--output_path", type=str,
+                        help="Destination to output CSV. Default is stdout.")
 
     tmp = parser.parse_args()
     args["verbose"], args["logger"] = verbose_check(tmp)
@@ -55,8 +57,9 @@ def parse_params():
         args["logger"].critical(err)
         exit(errno.EINVAL)
 
-    if tmp.max_replays:
-        args["max_replays"] = tmp.max_replays
+    for arg in ('max_replays', 'output_path'):
+        if hasattr(tmp, arg):
+            args[arg] = getattr(tmp, arg)
 
     # default thread count is 5
     args["threads"] = tmp.worker_threads if tmp.worker_threads > 0 else 5

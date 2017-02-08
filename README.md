@@ -11,15 +11,25 @@ requirements
 * A folder named 'replays' with .SC2Replay files inside
 
 
+arguments
+---------
+#### --replay_folder (-R): Path to directory we want to pull replay data from
+#### --max_replays (-M): Maximum number of replay files to parse (should be int)
+#### --all_matches (-a) [NOT IMPLEMENTED YET]: if set, parses all replays not just 1v1 matchups
+#### --verbose (-v): Print all output if set
+
 
 running
 --------
 
+### If you want to time this function:
 
 ```shell
 
 time python replayscan.py | tee starcraft_data.csv
 ```
+
+
 
 
 run time
@@ -43,7 +53,3 @@ example analytics
 
 
 ![Example Chart](watson_analytics.png)
-
-
-
-

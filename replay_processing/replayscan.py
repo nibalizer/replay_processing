@@ -10,6 +10,7 @@ def main():
     # Parse replays using params
     logger.info("Parsing Replay Files")
     match_data, count, errors, error_replays, match_stats, korean_replays = parse_replays(params["replay_dir"],
+                                                                                          params["threads"],
                                                                                           max_replays=params["max_replays"],
                                                                                           logger=logger)
 

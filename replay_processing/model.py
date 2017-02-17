@@ -99,12 +99,22 @@ def all_unit_created_events_by_type(events):
 _force_unit_types = {
     'MULE': 'worker',
     'Adept': 'army',
+    'Cyclone': 'army',
     'BarracksReactor': 'building',
     'BarracksTechLab': 'building',
-    'RoboticsFacility': 'building',
+    'Disruptor': 'army',
     'FactoryReactor': 'building',
     'FactoryTechLab': 'building',
-    'StarportReactor': 'building'
+    'Liberator': 'army',
+    'Lurker': 'army',
+    'LurkerDen': 'building',
+    'Ravager': 'army',
+    'RoboticsFacility': 'building',
+    'StarportReactor': 'building',
+    'StarportTechLab': 'building',
+    'Reactor': 'building',
+    'TechLab': 'building',
+    'TemplarArchive': 'building'
 }
 
 

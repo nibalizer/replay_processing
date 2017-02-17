@@ -23,8 +23,21 @@ def main():
 
     ignore_units = set([
         'AdeptPhaseShift',
+        'BroodlingEscort',
+        'DisruptorPhased',
+        'Egg',
+        'InfestedTerransEgg',
+        'KD8Charge',
+        'Larva',
         'LiberatorAG',
-        'PylonOvercharged'
+        'LurkerBurrowed',
+        'LurkerEgg',
+        'OracleStasisTrap',
+        'OverlordTransport',
+        'PointDefenseDrone',
+        'PylonOvercharged',
+        'RavagerCocoon',
+        'TransportOverlordCocoon'
     ])
 
     with open(args.output_path, 'w', newline='') as csvfile:
@@ -40,7 +53,8 @@ def main():
             try:
                 ev_type = model.unit_to_type_string(unit_event.unit)
             except ValueError:
-                if unit_event.unit.title in ignore_units:
+                if (unit_event.unit.title in ignore_units or
+                    unit_event.unit.title.startswith('Changeling')):
                     pass
                 else:
                     import pdb;pdb.set_trace()

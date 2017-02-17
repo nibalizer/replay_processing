@@ -23,6 +23,8 @@ def main():
 
     ignore_units = set([
         'AdeptPhaseShift',
+        'DisruptorPhased',
+        'KD8Charge',
         'LiberatorAG',
         'PylonOvercharged'
     ])

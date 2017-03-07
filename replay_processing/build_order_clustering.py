@@ -100,12 +100,37 @@ def main():
     scaled_dist = scale(dist_matrix)
 
     ap = AffinityPropagation(affinity='precomputed',
-                             damping=.9)
+                             damping=.7)
     ap.fit(scaled_dist)
 
     builds_by_label = collections.defaultdict(list)
     for i, label in enumerate(ap.labels_):
         builds_by_label[label].append(builds.get_by_player_id(i))
+
+
+    units_per_label = {}
+    for label, label_builds in builds_by_label.items():
+        unit_counts = collections.defaultdict(int)
+        for build in label_builds:
+            for unit in build.units:
+                unit_counts[unit] += 1
+        units_per_label[label] = sorted(unit_counts.items(),
+                                        key=lambda x: x[1],
+                                        reverse=True)
+
+    brief_units_per_labels = {}
+    for label, units_label in units_per_label.items():
+        if len(units_label) > 0:
+            max_units = units_label[0][1]
+            brief_units_per_labels[label] = list(filter(
+                lambda x: x[1] >= int(max_units * .6),
+                units_label
+            ))
+
+
+    label_popularity = collections.defaultdict(int)
+    for label in ap.labels_:
+        label_popularity[label] += 1
 
     import pdb;pdb.set_trace()
 

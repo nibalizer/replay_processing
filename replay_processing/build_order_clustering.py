@@ -36,20 +36,38 @@ class PlayerBuild(object):
         self.map_id = map_id
         self.map_player = map_player
         self._items = []
+        self._unit_counts = None
 
     @property
     def items(self):
         return sorted(self._items)
 
     @property
+    def unit_counts(self):
+        if self._unit_counts is not None:
+            return self._unit_counts
+        unit_counts = collections.defaultdict(int)
+        for ev in self._items:
+            unit_counts[ev.unit] += 1
+        self._unit_counts = unit_counts
+        return unit_counts
+
+    @property
     def units(self):
-        return set([x.unit for x in self._items])
+        return self.unit_counts.keys()
 
     def add_build_item(self, item):
         heapq.heappush(self._items, item)
 
     def common_units(self, other_build):
         return self.units & other_build.units
+
+    def unit_count_distance(self, other_build):
+        common_units = 0
+        for unit, count in self.unit_counts.items():
+            other_count = other_build.unit_counts.get(unit, 0)
+            common_units += min(count, other_count)
+        return common_units
 
 
 class PlayerBuilds(object):
@@ -80,13 +98,20 @@ def main():
     for path in glob.glob('%s/**/*.csv' % args.csv_dir, recursive=True):
         with open(path, newline='') as infile:
             csvfile = csv.reader(infile, delimiter=' ', quotechar='|')
-            next(csvfile)
+            try:
+                next(csvfile)
+                next(csvfile)
+            except StopIteration:
+                continue
             players = (builds.next_build(path, 0),
-                       builds.next_build(path, 0))
+                       builds.next_build(path, 1))
             for row in csvfile:
                 ev_time = int(row[0])
                 if ev_time > 0 and (args.time_cutoff == 0 or ev_time <= int(args.time_cutoff)):
-                    player = players[int(row[1]) - 1]
+                    try:
+                        player = players[int(row[1]) - 1]
+                    except ValueError:
+                        print('Invalid row in %s' % path)
                     unit = Unit(row[2], row[3])
                     build_item = BuildItem(row[0], unit)
                     player.add_build_item(build_item)
@@ -94,13 +119,13 @@ def main():
     dist_matrix = np.empty(shape=(len(builds), len(builds)))
     for player, build in builds.items():
         for other_player, other_build in builds.items():
-            dist = len(build.common_units(other_build))
+            dist = build.unit_count_distance(other_build)
             dist_matrix.itemset((player, other_player), dist)
 
     scaled_dist = scale(dist_matrix)
 
     ap = AffinityPropagation(affinity='precomputed',
-                             damping=.7)
+                             damping=.5)
     ap.fit(scaled_dist)
 
     builds_by_label = collections.defaultdict(list)
@@ -131,8 +156,31 @@ def main():
     label_popularity = collections.defaultdict(int)
     for label in ap.labels_:
         label_popularity[label] += 1
+    popular_labels = sorted(label_popularity.items(),
+                            key=lambda x: x[1],
+                            reverse=True)
 
-    import pdb;pdb.set_trace()
+    for label, popularity in popular_labels:
+        center_build_id = ap.cluster_centers_indices_[label]
+        center_build = builds.get_by_player_id(center_build_id)
+        print("Label ID %d with popularity %d" % (label, popularity))
+        print("\tCenter build:")
+        print("\t\tMap: %s" % center_build.map_id)
+        print("\t\tPlayer ID: %d" % (center_build.map_player + 1))
+        print("\tPopular units:")
+        try:
+            for unit, popularity in brief_units_per_labels[label]:
+                print("\t\t%s (%d)" % (unit, popularity))
+        except KeyError:
+            pass
+        print("\tBuilds:")
+        try:
+            for build in builds_by_label[label]:
+                print("\t\tMap: %s" % build.map_id)
+                print("\t\tPlayer ID: %d" % (build.map_player + 1))
+        except KeyError:
+            pass
+        print()
 
 
 if __name__ == '__main__':

@@ -47,6 +47,15 @@ def replays_from_dir(root_dir):
                glob.glob("%s/**/*.SC2Replay" % root_dir), recursive=True)
 
 
+def _replay_parse_guard(fn):
+    def wrapper(self, *args, **kwargs):
+        try:
+            return fn(self, *args, **kwargs)
+        except IndexError as e:
+            raise ReplayParseError(self.path, e)
+    return wrapper
+
+
 class Replay(object):
     def __init__(self, path):
         self.path = path
@@ -64,11 +73,14 @@ class Replay(object):
         return self._parsed_replay_obj
 
     @property
+    @_replay_parse_guard
     def events(self):
-        try:
-            return self._parsed_replay.events
-        except IndexError as e:
-            raise ReplayParseError(self.path, e)
+        return self._parsed_replay.events
+
+    @property
+    @_replay_parse_guard
+    def players(self):
+        return self._parsed_replay.players
 
 
 def event_type_names(events):

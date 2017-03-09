@@ -3,6 +3,7 @@ import collections
 import csv
 import glob
 import heapq
+from math import log
 import sys
 
 import numpy as np
@@ -46,9 +47,9 @@ class PlayerBuild(object):
     def unit_counts(self):
         if self._unit_counts is not None:
             return self._unit_counts
-        unit_counts = collections.defaultdict(int)
+        unit_counts = {}
         for ev in self._items:
-            unit_counts[ev.unit] += 1
+            unit_counts[ev.unit] = unit_counts.get(ev.unit, 0) + 1
         self._unit_counts = unit_counts
         return unit_counts
 
@@ -62,12 +63,40 @@ class PlayerBuild(object):
     def common_units(self, other_build):
         return self.units & other_build.units
 
-    def unit_count_distance(self, other_build):
+    def unit_count_similarity(self, other_build):
         common_units = 0
         for unit, count in self.unit_counts.items():
             other_count = other_build.unit_counts.get(unit, 0)
-            common_units += min(count, other_count)
+            comm_cnt = min(count, other_count)
+            comm_cnt = min(comm_cnt, 5)
+            common_units += .5 * self.harmonic_sum(comm_cnt)
         return common_units
+
+    def harmonic_sum(self, n):
+        "Taken from https://en.wikipedia.org/wiki/Harmonic_number"
+        if n == 0:
+            return 0
+        gamma = 0.5772156649
+        return gamma + log(n) + 0.5 / n - 1. / (12 * n**2) + 1. / (120 * n**4)
+
+    def unit_type_ratios(self, other_build):
+        all_units = set(self.units)
+        all_units.union(set(other_build.units))
+
+        total_units = len(all_units)
+        similar_units = 0
+
+        for unit in all_units:
+            count = self.unit_counts.get(unit, 0)
+            other_count = other_build.unit_counts.get(unit, 0)
+            try:
+                similar_units += min(count, other_count) / max(count, other_count)
+            except ZeroDivisionError:
+                import pdb;pdb.set_trace()
+
+        if total_units == 0:
+            return 0
+        return similar_units / total_units
 
 
 class PlayerBuilds(object):
@@ -99,12 +128,13 @@ def main():
         with open(path, newline='') as infile:
             csvfile = csv.reader(infile, delimiter=' ', quotechar='|')
             try:
-                next(csvfile)
+                firstline = infile.readline()[:-1]
                 next(csvfile)
             except StopIteration:
                 continue
-            players = (builds.next_build(path, 0),
-                       builds.next_build(path, 1))
+            map_path = firstline.split('"', 1)[1][:-1]
+            players = (builds.next_build(map_path, 0),
+                       builds.next_build(map_path, 1))
             for row in csvfile:
                 ev_time = int(row[0])
                 if ev_time > 0 and (args.time_cutoff == 0 or ev_time <= int(args.time_cutoff)):
@@ -119,10 +149,10 @@ def main():
     dist_matrix = np.empty(shape=(len(builds), len(builds)))
     for player, build in builds.items():
         for other_player, other_build in builds.items():
-            dist = build.unit_count_distance(other_build)
+            dist = build.unit_type_ratios(other_build)
             dist_matrix.itemset((player, other_player), dist)
 
-    scaled_dist = scale(dist_matrix)
+    scaled_dist = dist_matrix
 
     ap = AffinityPropagation(affinity='precomputed',
                              damping=.5)
@@ -165,8 +195,8 @@ def main():
         center_build = builds.get_by_player_id(center_build_id)
         print("Label ID %d with popularity %d" % (label, popularity))
         print("\tCenter build:")
-        print("\t\tMap: %s" % center_build.map_id)
-        print("\t\tPlayer ID: %d" % (center_build.map_player + 1))
+        print("\t\tPlayer ID: %d, Map %s" % ((center_build.map_player + 1),
+                                             center_build.map_id))
         print("\tPopular units:")
         try:
             for unit, popularity in brief_units_per_labels[label]:
@@ -176,8 +206,8 @@ def main():
         print("\tBuilds:")
         try:
             for build in builds_by_label[label]:
-                print("\t\tMap: %s" % build.map_id)
-                print("\t\tPlayer ID: %d" % (build.map_player + 1))
+                print("\t\tPlayer ID: %d, Map %s" % ((build.map_player + 1),
+                                                     build.map_id))
         except KeyError:
             pass
         print()

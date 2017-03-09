@@ -66,6 +66,12 @@ def gen_csv(replay_path, output_path):
                                quotechar='|', quoting=csv.QUOTE_MINIMAL)
 
         replay = model.Replay(replay_path)
+
+        if len(replay.players) != 2:
+            print("Non 2 player game %s" % replay_path)
+            return
+
+        csvfile.write('# generated from replay file "%s"\n' % replay_path)
         csvwriter.writerow(('time', 'team', 'event_type', 'event_name'))
         events = list(replay.events)
         for unit_event in model.unit_events(events):

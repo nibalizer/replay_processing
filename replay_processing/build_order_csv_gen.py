@@ -56,6 +56,7 @@ def gen_csv(replay_path, output_path):
         'ParasiticBombDummy',
         'PointDefenseDrone',
         'PylonOvercharged',
+        'RavagerBurrowed',
         'RavagerCocoon',
         'ThorAP',
         'TransportOverlordCocoon'

@@ -5,6 +5,16 @@ import os
 
 import sc2reader
 
+
+class ReplayParseError(Exception):
+    def __init__(self, replay_path, exc):
+        super(ReplayParseError, self).__init__(
+            'Failed to parse replay file %s' % replay_path
+        )
+        self.replay_path = replay_path
+        self.exc = exc
+
+
 # I have no idea what these are, but they always exist as unit events
 # before the game begins
 BEACON_UNITS = set([
@@ -55,7 +65,10 @@ class Replay(object):
 
     @property
     def events(self):
-        return self._parsed_replay.events
+        try:
+            return self._parsed_replay.events
+        except IndexError as e:
+            raise ReplayParseError(self.path, e)
 
 
 def event_type_names(events):
@@ -99,15 +112,18 @@ def all_unit_created_events_by_type(events):
 _force_unit_types = {
     'MULE': 'worker',
     'Adept': 'army',
+    'AutoTurret': 'army',
     'Cyclone': 'army',
     'BarracksReactor': 'building',
     'BarracksTechLab': 'building',
     'Disruptor': 'army',
     'FactoryReactor': 'building',
     'FactoryTechLab': 'building',
+    'Interceptor': 'army',
     'Liberator': 'army',
     'Lurker': 'army',
     'LurkerDen': 'building',
+    'Nuke': 'army',
     'Ravager': 'army',
     'RoboticsFacility': 'building',
     'StarportReactor': 'building',

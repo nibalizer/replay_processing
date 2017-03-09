@@ -1,5 +1,7 @@
 import argparse
 import csv
+import glob
+import hashlib
 import logging
 import os
 import sys
@@ -12,7 +14,7 @@ def parse_args(args):
                         help="Path to replay directory.",
                         type=str)
     parser.add_argument("output_path",
-                        help="Path to write out CSV to.",
+                        help="Path to directory to place csv files.",
                         type=str)
 
     return parser.parse_args(args)
@@ -20,31 +22,50 @@ def parse_args(args):
 
 def main():
     args = parse_args(sys.argv[1:])
+    output_path = os.path.join(args.output_path, '%s.csv')
+    replays = glob.glob('%s/**/*.SC2Replay' % args.replay_path,
+                        recursive=True)
+    for path in replays:
+        path_hash = hashlib.sha256(path.encode('utf-8')).hexdigest()
+        out_name = '%s-%s' % (path_hash, os.path.basename(path))
+        try:
+            gen_csv(path, output_path % out_name)
+        except model.ReplayParseError as e:
+            print('Replay parse error: %s' % e)
+            continue
 
+
+def gen_csv(replay_path, output_path):
     ignore_units = set([
         'AdeptPhaseShift',
         'BroodlingEscort',
+        'CreepTumorQueen',
         'DisruptorPhased',
         'Egg',
+        'ForceField',
         'InfestedTerransEgg',
         'KD8Charge',
         'Larva',
         'LiberatorAG',
+        'LocustMPPrecursor',
+        'LocustMPFlying',
         'LurkerBurrowed',
         'LurkerEgg',
         'OracleStasisTrap',
         'OverlordTransport',
+        'ParasiticBombDummy',
         'PointDefenseDrone',
         'PylonOvercharged',
         'RavagerCocoon',
+        'ThorAP',
         'TransportOverlordCocoon'
     ])
 
-    with open(args.output_path, 'w', newline='') as csvfile:
+    with open(output_path, 'w', newline='') as csvfile:
         csvwriter = csv.writer(csvfile, delimiter=' ',
                                quotechar='|', quoting=csv.QUOTE_MINIMAL)
 
-        replay = model.Replay(args.replay_path)
+        replay = model.Replay(replay_path)
         csvwriter.writerow(('time', 'team', 'event_type', 'event_name'))
         events = list(replay.events)
         for unit_event in model.unit_events(events):
@@ -53,11 +74,15 @@ def main():
             try:
                 ev_type = model.unit_to_type_string(unit_event.unit)
             except ValueError:
-                if (unit_event.unit.title in ignore_units or
-                    unit_event.unit.title.startswith('Changeling')):
-                    pass
-                else:
-                    import pdb;pdb.set_trace()
+                try:
+                    if (unit_event.unit.title in ignore_units or
+                        unit_event.unit.title.startswith('Changeling') or
+                        unit_event.unit.title.startswith('Shape')):
+                        continue
+                    else:
+                        import pdb;pdb.set_trace()
+                except AttributeError:
+                    continue
             ev_name = unit_event.unit.title
 
             csvwriter.writerow((time, team, ev_type, ev_name))

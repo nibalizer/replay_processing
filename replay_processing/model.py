@@ -51,7 +51,7 @@ def _replay_parse_guard(fn):
     def wrapper(self, *args, **kwargs):
         try:
             return fn(self, *args, **kwargs)
-        except IndexError as e:
+        except (IndexError, AttributeError) as e:
             raise ReplayParseError(self.path, e)
     return wrapper
 
@@ -64,6 +64,11 @@ class Replay(object):
     @property
     def name(self):
         return os.path.basename(self.path)
+
+    @property
+    @_replay_parse_guard
+    def seconds(self):
+        return self._parsed_replay.real_length.seconds
 
     @property
     def _parsed_replay(self):

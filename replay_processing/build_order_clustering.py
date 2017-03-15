@@ -53,6 +53,12 @@ class PlayerBuild(object):
         self._unit_counts = unit_counts
         return unit_counts
 
+    def unit_counts_before(self, time):
+        counts = {}
+        for item in iter(self.items_before(time)):
+            counts[item.unit] = counts.get(item.unit, 0) + 1
+        return counts
+
     @property
     def units(self):
         return self.unit_counts.keys()
@@ -62,6 +68,12 @@ class PlayerBuild(object):
 
     def common_units(self, other_build):
         return self.units & other_build.units
+
+    def items_before(self, time):
+        for item in self.items:
+            if item.time > time:
+                return
+            yield item
 
     def unit_count_similarity(self, other_build):
         common_units = 0
@@ -79,24 +91,34 @@ class PlayerBuild(object):
         gamma = 0.5772156649
         return gamma + log(n) + 0.5 / n - 1. / (12 * n**2) + 1. / (120 * n**4)
 
-    def unit_type_ratios(self, other_build):
-        all_units = set(self.units)
-        all_units.union(set(other_build.units))
+    def unit_type_ratios(self, other_build, unit_popularity):
+        try:
+            end_time = min(self.items[-1].time,
+                           other_build.items[-1].time)
+        except IndexError:
+            return 0
 
-        total_units = len(all_units)
-        similar_units = 0
+        my_counts = self.unit_counts_before(end_time)
+        other_counts = other_build.unit_counts_before(end_time)
+
+        all_units = set(my_counts.keys())
+        all_units.union(set(other_counts.keys()))
+
+        max_score = 0
+        score = 0
 
         for unit in all_units:
-            count = self.unit_counts.get(unit, 0)
-            other_count = other_build.unit_counts.get(unit, 0)
-            try:
-                similar_units += min(count, other_count) / max(count, other_count)
-            except ZeroDivisionError:
-                import pdb;pdb.set_trace()
+            unit_count = my_counts.get(unit, 0)
+            other_unit_count = other_counts.get(unit, 0)
 
-        if total_units == 0:
+            weight = unit_popularity.get(unit, 1)
+            unit_score = min(unit_count, other_unit_count)
+            score += unit_score
+            max_score += weight * max(unit_count, other_unit_count)
+
+        if max_score == 0:
             return 0
-        return similar_units / total_units
+        return score / max_score
 
 
 class PlayerBuilds(object):
@@ -117,6 +139,13 @@ class PlayerBuilds(object):
 
     def items(self):
         return self._builds.items()
+
+    def unit_build_popularity_counts(self):
+        counts = {}
+        for build_id, build in self._builds.items():
+            for unit in build.units:
+                counts[unit] = counts.get(unit, 0) + 1
+        return counts
 
 
 def main():
@@ -146,10 +175,25 @@ def main():
                     build_item = BuildItem(row[0], unit)
                     player.add_build_item(build_item)
 
+    unit_popularity = builds.unit_build_popularity_counts()
+
     dist_matrix = np.empty(shape=(len(builds), len(builds)))
+
+    # Distance from a->b == distance from b->a
+    distance_cache = {}
+
     for player, build in builds.items():
         for other_player, other_build in builds.items():
-            dist = build.unit_type_ratios(other_build)
+            try:
+                dist = distance_cache[(build.player_id, other_build.player_id)]
+            except KeyError:
+                try:
+                    dist = distance_cache[(other_build.player_id,
+                                           build.player_id)]
+                except KeyError:
+                    dist = build.unit_type_ratios(other_build, unit_popularity)
+                    distance_cache[(build.player_id,
+                                    other_build.player_id)] = dist
             dist_matrix.itemset((player, other_player), dist)
 
     scaled_dist = dist_matrix
@@ -205,11 +249,19 @@ def main():
             pass
         print("\tBuilds:")
         try:
-            for build in builds_by_label[label]:
-                print("\t\tPlayer ID: %d, Map %s" % ((build.map_player + 1),
-                                                     build.map_id))
+            label_builds = builds_by_label[label]
         except KeyError:
             pass
+        for build in label_builds:
+            try:
+                dist = distance_cache[(build.player_id,
+                                       center_build.player_id)]
+            except KeyError:
+                dist = distance_cache[(center_build.player_id,
+                                       build.player_id)]
+            print("\t\tAffinity: %f Player ID: %d, Map %s" % (
+                dist, (build.map_player + 1), build.map_id)
+            )
         print()
 
 

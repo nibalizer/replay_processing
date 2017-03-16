@@ -38,6 +38,7 @@ class PlayerBuild(object):
         self.map_player = map_player
         self._items = []
         self._unit_counts = None
+        self._events_by_unit = None
 
     @property
     def items(self):
@@ -53,11 +54,20 @@ class PlayerBuild(object):
         self._unit_counts = unit_counts
         return unit_counts
 
-    def unit_counts_before(self, time):
-        counts = {}
-        for item in iter(self.items_before(time)):
-            counts[item.unit] = counts.get(item.unit, 0) + 1
-        return counts
+    @property
+    def events_by_unit(self):
+        if self._events_by_unit is not None:
+            return self._events_by_unit
+
+        self._events_by_unit = {}
+        for item in iter(self.items):
+            unit_events = self._events_by_unit.get(item.unit)
+            if unit_events is None:
+                unit_events = collections.deque()
+            unit_events.append(item)
+            self._events_by_unit[item.unit] = unit_events
+
+        return self._events_by_unit
 
     @property
     def units(self):
@@ -92,33 +102,31 @@ class PlayerBuild(object):
         return gamma + log(n) + 0.5 / n - 1. / (12 * n**2) + 1. / (120 * n**4)
 
     def unit_type_ratios(self, other_build, unit_popularity):
-        try:
-            end_time = min(self.items[-1].time,
-                           other_build.items[-1].time)
-        except IndexError:
-            return 0
+        my_unit_events = self.events_by_unit
+        other_unit_events = other_build.events_by_unit
 
-        my_counts = self.unit_counts_before(end_time)
-        other_counts = other_build.unit_counts_before(end_time)
-
-        all_units = set(my_counts.keys())
-        all_units.union(set(other_counts.keys()))
+        all_units = set(my_unit_events.keys())
+        all_units.union(set(other_unit_events.keys()))
 
         max_score = 0
         score = 0
 
         for unit in all_units:
-            unit_count = my_counts.get(unit, 0)
-            other_unit_count = other_counts.get(unit, 0)
+            unit_count = len(my_unit_events.get(unit, []))
+            other_unit_count = len(other_unit_events.get(unit, []))
 
             weight = unit_popularity.get(unit, 1)
-            unit_score = min(unit_count, other_unit_count)
+            unit_score = min(unit_count, other_unit_count) / weight
             score += unit_score
-            max_score += weight * max(unit_count, other_unit_count)
+            max_score += max(unit_count, other_unit_count) / weight
 
         if max_score == 0:
             return 0
-        return score / max_score
+
+        score = score / max_score
+        if score == 1 and self.map_id != other_build.map_id:
+            import pdb;pdb.set_trace
+        return score
 
 
 class PlayerBuilds(object):
@@ -169,10 +177,10 @@ def main():
                 if ev_time > 0 and (args.time_cutoff == 0 or ev_time <= int(args.time_cutoff)):
                     try:
                         player = players[int(row[1]) - 1]
-                    except ValueError:
+                    except (ValueError, IndexError):
                         print('Invalid row in %s' % path)
                     unit = Unit(row[2], row[3])
-                    build_item = BuildItem(row[0], unit)
+                    build_item = BuildItem(ev_time, unit)
                     player.add_build_item(build_item)
 
     unit_popularity = builds.unit_build_popularity_counts()

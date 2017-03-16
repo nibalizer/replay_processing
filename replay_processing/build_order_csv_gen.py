@@ -78,8 +78,8 @@ def gen_csv(replay_path, output_path):
         replay = model.Replay(replay_path)
 
         try:
-            if replay.seconds < 360:
-                print("Replay too short (under 360 seconds): %s" % replay_path)
+            if replay.seconds < 600:
+                print("Replay too short (under 600 seconds): %s" % replay_path)
                 return
         except model.ReplayParseError as e:
             print(e)

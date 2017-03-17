@@ -1,7 +1,6 @@
 import argparse
 import csv
 import glob
-import hashlib
 import logging
 import os
 import sys
@@ -22,14 +21,18 @@ def parse_args(args):
 
 def main():
     args = parse_args(sys.argv[1:])
-    output_path = os.path.join(args.output_path, '%s.csv')
     replays = glob.glob('%s/**/*.SC2Replay' % args.replay_path,
                         recursive=True)
     for path in replays:
-        path_hash = hashlib.sha256(path.encode('utf-8')).hexdigest()
-        out_name = '%s-%s' % (path_hash, os.path.basename(path))
+        out_name = os.path.basename(path).split('.', 1)[0]
+        out_dir = os.path.join(args.output_path, out_name[0])
         try:
-            gen_csv(path, output_path % out_name)
+            os.mkdir(out_dir)
+        except OSError:
+            pass
+        out_path = os.path.join(out_dir, '.'.join((out_name, 'csv')))
+        try:
+            gen_csv(path, out_path)
         except model.ReplayParseError as e:
             print('Replay parse error: %s' % e)
             continue

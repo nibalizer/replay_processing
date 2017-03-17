@@ -1,6 +1,7 @@
 import collections
 import glob
 import itertools
+import json
 import os
 
 import sc2reader
@@ -163,3 +164,80 @@ def unit_to_type_string(unit):
         return _force_unit_types[unit.title]
     except KeyError:
         raise ValueError('Not a unit!')
+
+
+class ClusteringBuild(object):
+    @staticmethod
+    def from_map_player_key(key, clustering_data):
+        map_player, map_id = key.split('@')
+        return ClusteringBuild(map_player, map_id, clustering_data)
+
+    def __init__(self, map_player, map_id, clustering_data):
+        self.map_player = map_player
+        self.map_id = map_id
+        self.clustering_data = clustering_data
+
+    @property
+    def affinity(self):
+        return self.clustering_data['affinity']
+
+    @property
+    def replay_path(self):
+        return os.path.join(replays_dir,
+                            self.map_id[0],
+                            '.'.join(self.map_id, 'SC2Replay'))
+
+    @property
+    def csv_path(self):
+        return os.path.join(csv_dir,
+                            self.map_id[0],
+                            '.'.join(self.map_id, 'csv'))
+
+
+class ClusteringLabel(object):
+    def __init__(self, label, data):
+        self.label = label
+        self.data = data
+
+    @property
+    def center(self):
+        center_key = self.data['center']
+        center_data = self.data['builds'][center_key]
+        return ClusteringBuild.from_map_player_key(center_key,
+                                                   center_data)
+
+    @property
+    def builds(self):
+        return [ClusteringBuild.from_map_player_key(key, val) for key, val in
+                self.data['builds'].items()]
+
+    def __len__(self):
+        return len(self.data['builds'])
+
+
+class ClusteringData(object):
+    def __init__(self, path):
+        self.path = path
+        self._raw_data = None
+
+    @property
+    def raw_data(self):
+        if self._raw_data is None:
+            with open(self.path) as fh:
+                self._raw_data = json.load(fh)
+        return self._raw_data
+
+    @property
+    def labels(self):
+        return {label: ClusteringLabel(label, label_data) for label, label_data
+                in self.raw_data['labels'].items()}
+
+
+class ClusteringDataDir(object):
+    def __init__(self, path):
+        self.path = path
+
+    def clustering_data(self, name):
+        return ClusteringData(os.path.join(self.path,
+                                           'clusterings',
+                                           '.'.join((name, 'json'))))

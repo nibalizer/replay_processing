@@ -3,7 +3,9 @@ import collections
 import csv
 import glob
 import heapq
+import json
 from math import log
+import os
 import sys
 
 import numpy as np
@@ -17,6 +19,9 @@ def parse_args(args):
     parser.add_argument("csv_dir",
                         help="Path to directory of build order csvs.",
                         type=str)
+    parser.add_argument("output_path",
+                        help="Path to json clustering output destination.",
+                        type=str)
     parser.add_argument("--time-cutoff",
                         help="Seconds to stop considering data.",
                         type=int,
@@ -28,7 +33,7 @@ def parse_args(args):
 Unit = collections.namedtuple('Unit', ['type', 'name'])
 
 
-BuildItem = collections.namedtuple('BuildItem', ['time', 'unit'])
+BuildItem = collections.namedtuple('BuildItem', ['ev_ndx', 'time', 'unit'])
 
 
 class PlayerBuild(object):
@@ -39,6 +44,14 @@ class PlayerBuild(object):
         self._items = []
         self._unit_counts = None
         self._events_by_unit = None
+
+    @property
+    def map_player_key(self):
+        return '@'.join((str(self.map_player + 1), self.map_sha))
+
+    @property
+    def map_sha(self):
+        return os.path.basename(self.map_id).split('.', 1)[0]
 
     @property
     def items(self):
@@ -101,6 +114,35 @@ class PlayerBuild(object):
         gamma = 0.5772156649
         return gamma + log(n) + 0.5 / n - 1. / (12 * n**2) + 1. / (120 * n**4)
 
+    def unit_events_affinity(self, my_events, other_events, pdb=False):
+        score = 0
+        max_score = max(len(my_events), len(other_events))
+        used_events = set()
+        for my_event in my_events:
+            closest = None
+            closest_dist = 0
+            for other_event in other_events:
+                if other_event in used_events:
+                    continue
+                if (closest is None or
+                    abs(closest.time - my_event.time) < closest_dist):
+                    closest = other_event
+                    closest_dist = abs(closest.time - my_event.time)
+                
+            if closest != None:
+                used_events.add(closest)
+                ev_score = 1 / max(1, closest_dist / 600)
+                if pdb and ev_score != 1:
+                    import pdb;pdb.set_trace()
+                score += ev_score
+
+        if max_score is 0:
+            return 0
+
+        if pdb and score / max_score != 1:
+            import pdb;pdb.set_trace()
+        return score / max_score
+
     def unit_type_ratios(self, other_build, unit_popularity):
         my_unit_events = self.events_by_unit
         other_unit_events = other_build.events_by_unit
@@ -112,13 +154,20 @@ class PlayerBuild(object):
         score = 0
 
         for unit in all_units:
-            unit_count = len(my_unit_events.get(unit, []))
-            other_unit_count = len(other_unit_events.get(unit, []))
+            cur_events = my_unit_events.get(unit, [])
+            other_cur_events = other_unit_events.get(unit, [])
 
             weight = unit_popularity.get(unit, 1)
-            unit_score = min(unit_count, other_unit_count) / weight
-            score += unit_score
-            max_score += max(unit_count, other_unit_count) / weight
+            unit_score = self.unit_events_affinity(cur_events,
+                                                   other_cur_events)
+
+            if other_build.map_id == self.map_id and self.map_player == other_build.map_player and unit_score != 0:
+                unit_score = self.unit_events_affinity(cur_events,
+                                                       other_cur_events,
+                                                       pdb=True)
+
+            score += unit_score / weight
+            max_score += 1 / weight
 
         if max_score == 0:
             return 0
@@ -172,7 +221,7 @@ def main():
             map_path = firstline.split('"', 1)[1][:-1]
             players = (builds.next_build(map_path, 0),
                        builds.next_build(map_path, 1))
-            for row in csvfile:
+            for ev_ndx, row in enumerate(csvfile):
                 ev_time = int(row[0])
                 if ev_time > 0 and (args.time_cutoff == 0 or ev_time <= int(args.time_cutoff)):
                     try:
@@ -180,7 +229,7 @@ def main():
                     except (ValueError, IndexError):
                         print('Invalid row in %s' % path)
                     unit = Unit(row[2], row[3])
-                    build_item = BuildItem(ev_time, unit)
+                    build_item = BuildItem(ev_ndx, ev_time, unit)
                     player.add_build_item(build_item)
 
     unit_popularity = builds.unit_build_popularity_counts()
@@ -213,6 +262,30 @@ def main():
     builds_by_label = collections.defaultdict(list)
     for i, label in enumerate(ap.labels_):
         builds_by_label[label].append(builds.get_by_player_id(i))
+
+    with open(args.output_path, 'w') as fh:
+        labels_output = {}
+        for label, _builds in builds_by_label.items():
+            _builds_out = {}
+            for _build in _builds:
+                center_build_id = ap.cluster_centers_indices_[label]
+                center_build = builds.get_by_player_id(center_build_id)
+                try:
+                    dist = distance_cache[(_build.player_id,
+                                           center_build.player_id)]
+                except KeyError:
+                    dist = distance_cache[(center_build.player_id,
+                                           _build.player_id)]
+                _builds_out[_build.map_player_key] = { 'affinity': dist }
+            labels_output[str(label)] = {
+                'builds': _builds_out,
+                'center': center_build.map_player_key
+            }
+        output = {
+            'labels': labels_output,
+            'confidence': 1
+        }
+        json.dump(output, fh, indent=4, separators=(',', ': '))
 
 
     units_per_label = {}

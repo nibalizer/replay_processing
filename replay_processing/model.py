@@ -195,8 +195,9 @@ class ClusteringBuild(object):
 
 
 class ClusteringLabel(object):
-    def __init__(self, label, data):
+    def __init__(self, label, description, data):
         self.label = label
+        self.description = description
         self.data = data
 
     @property
@@ -216,8 +217,9 @@ class ClusteringLabel(object):
 
 
 class ClusteringData(object):
-    def __init__(self, path):
+    def __init__(self, path, label_map):
         self.path = path
+        self.label_map = label_map
         self._raw_data = None
 
     @property
@@ -229,8 +231,40 @@ class ClusteringData(object):
 
     @property
     def labels(self):
-        return {label: ClusteringLabel(label, label_data) for label, label_data
-                in self.raw_data['labels'].items()}
+        ret = {}
+        for label, label_data in self.raw_data['labels'].items():
+            desc = self.label_map.description(label)
+            c_l = ClusteringLabel(label, desc, label_data)
+            ret[label] = c_l
+        return ret
+
+
+class ClusteringLabelMap(object):
+    def __init__(self, label_map_path, tags_path):
+        self.label_map_path = label_map_path
+        self.tags_path = tags_path
+        self._label_map = None
+        self._tags = None
+
+    @property
+    def label_map(self):
+        if self._label_map is None:
+            with open(self.label_map_path) as fh:
+                self._label_map = json.load(fh)
+        return self._label_map
+
+    @property
+    def tags(self):
+        if self._tags is None:
+            with open(self.tags_path) as fh:
+                self._tags = json.load(fh)
+        return self._tags
+
+    def description(self, label):
+        tag = self.label_map.get(label)
+        if tag is None:
+            return None
+        return self.tags.get(tag, {}).get('description')
 
 
 class ClusteringDataDir(object):
@@ -238,6 +272,14 @@ class ClusteringDataDir(object):
         self.path = path
 
     def clustering_data(self, name):
+        label_map = ClusteringLabelMap(
+            os.path.join(self.path, 'cluster_tag_mappings',
+                         '.'.join((name, 'json'))),
+            os.path.join(self.path,
+                         '.'.join(('cluster_tags', 'json')))
+        )
+
         return ClusteringData(os.path.join(self.path,
                                            'clusterings',
-                                           '.'.join((name, 'json'))))
+                                           '.'.join((name, 'json'))),
+                              label_map)

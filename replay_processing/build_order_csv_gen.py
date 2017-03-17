@@ -1,7 +1,6 @@
 import argparse
 import csv
 import glob
-import hashlib
 import logging
 import os
 import sys
@@ -22,14 +21,18 @@ def parse_args(args):
 
 def main():
     args = parse_args(sys.argv[1:])
-    output_path = os.path.join(args.output_path, '%s.csv')
     replays = glob.glob('%s/**/*.SC2Replay' % args.replay_path,
                         recursive=True)
     for path in replays:
-        path_hash = hashlib.sha256(path.encode('utf-8')).hexdigest()
-        out_name = '%s-%s' % (path_hash, os.path.basename(path))
+        out_name = os.path.basename(path).split('.', 1)[0]
+        out_dir = os.path.join(args.output_path, out_name[0])
         try:
-            gen_csv(path, output_path % out_name)
+            os.mkdir(out_dir)
+        except OSError:
+            pass
+        out_path = os.path.join(out_dir, '.'.join((out_name, 'csv')))
+        try:
+            gen_csv(path, out_path)
         except model.ReplayParseError as e:
             print('Replay parse error: %s' % e)
             continue
@@ -38,7 +41,9 @@ def main():
 def gen_csv(replay_path, output_path):
     ignore_units = set([
         'AdeptPhaseShift',
+        'AutoTurret',
         'BroodlingEscort',
+        'CreepTumorBurrowed',
         'CreepTumorQueen',
         'DisruptorPhased',
         'Egg',
@@ -51,13 +56,20 @@ def gen_csv(replay_path, output_path):
         'LocustMPFlying',
         'LurkerBurrowed',
         'LurkerEgg',
+        'MULE',
         'OracleStasisTrap',
+        'Overlord',
         'OverlordTransport',
         'ParasiticBombDummy',
         'PointDefenseDrone',
+        'Pylon',
         'PylonOvercharged',
         'RavagerBurrowed',
         'RavagerCocoon',
+        'SprayProtoss',
+        'SprayTerran',
+        'SprayZerg',
+        'SupplyDepotLowered',
         'ThorAP',
         'TransportOverlordCocoon'
     ])
@@ -68,6 +80,14 @@ def gen_csv(replay_path, output_path):
 
         replay = model.Replay(replay_path)
 
+        try:
+            if replay.seconds < 600:
+                print("Replay too short (under 600 seconds): %s" % replay_path)
+                return
+        except model.ReplayParseError as e:
+            print(e)
+            return
+
         if len(replay.players) != 2:
             print("Non 2 player game %s" % replay_path)
             return
@@ -76,6 +96,8 @@ def gen_csv(replay_path, output_path):
         csvwriter.writerow(('time', 'team', 'event_type', 'event_name'))
         events = list(replay.events)
         for unit_event in model.unit_events(events):
+            if unit_event.unit.title in ignore_units or unit_event.unit.is_worker:
+                continue
             time = unit_event.second
             team = unit_event.unit.owner.team_id
             try:
@@ -97,6 +119,8 @@ def gen_csv(replay_path, output_path):
         upgrade_events = model.events_by_type(events,
                                               ('UpgradeCompleteEvent', ))
         for upgrade_event in upgrade_events:
+            if upgrade_event.upgrade_type_name in ignore_units:
+                continue
             time = upgrade_event.second
             team = upgrade_event.player.team_id
             ev_type = 'upgrade'

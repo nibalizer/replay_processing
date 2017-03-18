@@ -5,19 +5,20 @@ import glob
 import heapq
 import json
 from math import log
+import msgpack
 import os
 import sys
 
 import numpy as np
 from sklearn.preprocessing import scale
-from sklearn.decomposition import PCA
-
 from sklearn.cluster import AffinityPropagation
+
+from replay_processing import model
 
 def parse_args(args):
     parser = argparse.ArgumentParser()
-    parser.add_argument("csv_dir",
-                        help="Path to directory of build order csvs.",
+    parser.add_argument("clustering_dir",
+                        help="Path to clustering data directory",
                         type=str)
     parser.add_argument("output_path",
                         help="Path to json clustering output destination.",
@@ -210,27 +211,43 @@ def main():
 
     builds = PlayerBuilds()
 
-    for path in glob.glob('%s/**/*.csv' % args.csv_dir, recursive=True):
-        with open(path, newline='') as infile:
-            csvfile = csv.reader(infile, delimiter=' ', quotechar='|')
-            try:
-                firstline = infile.readline()[:-1]
-                next(csvfile)
-            except StopIteration:
+    events_dir = os.path.join(args.clustering_dir, 'replay_info', 'events')
+    clustering_dir = model.ClusteringDataDir(args.clustering_dir)
+    replays_info = clustering_dir.replays_info
+
+    print("Loading builds...",)
+    for path in glob.glob('%s/**/*.json' % events_dir, recursive=True):
+        with open(path, 'rb') as events_file:
+            events = msgpack.unpack(events_file)
+            map_path = os.path.basename(path).split('.')[0]
+            replay_info = replays_info.replay(map_path)
+            if replay_info.seconds < 600:
+                print("Replay %s too short %d seconds" % (map_path,
+                                                          replay_info.seconds))
                 continue
-            map_path = firstline.split('"', 1)[1][:-1]
             players = (builds.next_build(map_path, 0),
                        builds.next_build(map_path, 1))
-            for ev_ndx, row in enumerate(csvfile):
-                ev_time = int(row[0])
+            for ev_ndx, event in enumerate(events):
+                if event[3].decode('utf-8') in model.IGNORE_UNITS:
+                    continue
+                ev_time = event[1]
                 if ev_time > 0 and (args.time_cutoff == 0 or ev_time <= int(args.time_cutoff)):
                     try:
-                        player = players[int(row[1]) - 1]
-                    except (ValueError, IndexError):
+                        player = players[event[2] - 1]
+                    except (ValueError, TypeError, IndexError):
                         print('Invalid row in %s' % path)
-                    unit = Unit(row[2], row[3])
+                    unit_type = event[0]
+                    if unit_type != b'upgrade':
+                         unit_type = event[4]
+                    unit = Unit(unit_type.decode('utf-8'),
+                                event[3].decode('utf-8'))
+                    if (unit.type == 'worker' or
+                        unit.name.startswith('Changeling') or
+                        unit.name.startswith('Shape')):
+                        continue
                     build_item = BuildItem(ev_ndx, ev_time, unit)
                     player.add_build_item(build_item)
+    print("done")
 
     unit_popularity = builds.unit_build_popularity_counts()
 
@@ -239,6 +256,7 @@ def main():
     # Distance from a->b == distance from b->a
     distance_cache = {}
 
+    print("Building affinity matrix...")
     for player, build in builds.items():
         for other_player, other_build in builds.items():
             try:
@@ -252,12 +270,15 @@ def main():
                     distance_cache[(build.player_id,
                                     other_build.player_id)] = dist
             dist_matrix.itemset((player, other_player), dist)
+    print("done")
 
     scaled_dist = dist_matrix
 
     ap = AffinityPropagation(affinity='precomputed',
                              damping=.5)
+    print("Running clustering...")
     ap.fit(scaled_dist)
+    print("done")
 
     builds_by_label = collections.defaultdict(list)
     for i, label in enumerate(ap.labels_):

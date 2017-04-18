@@ -28,6 +28,9 @@ def main():
     for _dir in (metadata_dir, events_dir):
         os.makedirs(_dir, exist_ok=True)
 
+    unit_popularity = {}
+    popularity_dest = os.path.join(dest_dir,
+                                   '.'.join(('unit_popularity', 'json')))
     for replay in model.replays_from_dir(args.replays_dir):
         try:
             replay_info = {
@@ -53,6 +56,7 @@ def main():
             metadata_dest = os.path.join(met_dest_dir,
                                          '.'.join((replay.id, 'json')))
             ev_dest = os.path.join(ev_dest_dir, '.'.join((replay.id, 'json')))
+
             with open(metadata_dest, 'wb') as fh:
                 msgpack.pack(replay_info, fh)
             with open(ev_dest, 'wb') as fh:
@@ -67,9 +71,19 @@ def main():
                                    event.unit.owner.team_id,
                                    event.unit.title,
                                    unit_type))
+                    unit = model.Unit(unit_type, event.unit.title)
+                    unit_popularity[unit] = unit_popularity.get(unit, 0) + 1
                 for event in upgrade_events:
                     events.append(('upgrade',
                                    event.second,
                                    event.player.team_id,
                                    event.upgrade_type_name))
+                    unit = model.Unit('upgrade', event.upgrade_type_name)
+                    unit_popularity[unit] = unit_popularity.get(unit, 0) + 1
                 msgpack.pack(list(events), fh)
+
+    pops_list = []
+    with open(popularity_dest, 'wb') as fh:
+        for unit, popularity in unit_popularity.items():
+            pops_list.append(((unit[0], unit[1]), popularity))
+        msgpack.pack(pops_list, fh)

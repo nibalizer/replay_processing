@@ -46,6 +46,7 @@ UNIT_CREATED_EVENT_TYPES = [
 IGNORE_UNITS = set([
     'AdeptPhaseShift',
     'AutoTurret',
+    'Broodling',
     'BroodlingEscort',
     'CreepTumorBurrowed',
     'CreepTumorQueen',
@@ -53,6 +54,7 @@ IGNORE_UNITS = set([
     'Egg',
     'ForceField',
     'InfestedTerransEgg',
+    'Interceptor',
     'KD8Charge',
     'Larva',
     'LiberatorAG',
@@ -70,6 +72,7 @@ IGNORE_UNITS = set([
     'PylonOvercharged',
     'RavagerBurrowed',
     'RavagerCocoon',
+    'SiegeTankSieged',
     'SprayProtoss',
     'SprayTerran',
     'SprayZerg',
@@ -77,6 +80,11 @@ IGNORE_UNITS = set([
     'ThorAP',
     'TransportOverlordCocoon'
 ])
+
+Unit = collections.namedtuple('Unit', ['type', 'name'])
+
+
+BuildItem = collections.namedtuple('BuildItem', ['ev_ndx', 'time', 'unit'])
 
 
 def replays_from_dir(root_dir):
@@ -135,9 +143,10 @@ class Replay(object):
 
 
 class ReplayInfo(object):
-    def __init__(self, seconds, map_name):
+    def __init__(self, seconds, map_name, players):
         self.seconds = seconds
         self.map_name = map_name
+        self.players = players
 
 
 class ReplaysInfoCache(object):
@@ -152,7 +161,8 @@ class ReplaysInfoCache(object):
 
     def replay(self, replay_id):
         data = self.load_data(replay_id)
-        return ReplayInfo(data[b'seconds'], data[b'map_name'].decode('utf-8'))
+        return ReplayInfo(data[b'seconds'], data[b'map_name'].decode('utf-8'),
+                          [x.decode('utf-8') for x in data[b'players']])
 
 
 def event_type_names(events):
@@ -236,7 +246,7 @@ class ClusteringBuild(object):
     @staticmethod
     def from_map_player_key(key, clustering_data):
         map_player, map_id = key.split('@')
-        return ClusteringBuild(map_player, map_id, clustering_data)
+        return ClusteringBuild(int(map_player), map_id, clustering_data)
 
     def __init__(self, map_player, map_id, clustering_data):
         self.map_player = map_player
@@ -251,6 +261,12 @@ class ClusteringBuild(object):
         return os.path.join(replays_dir,
                             self.map_id[0],
                             '.'.join((self.map_id, 'SC2Replay')))
+
+    @property
+    def events_path(self):
+        return os.path.join('/home/greghaynes/Projects/devadv/sc2-clustering-data/data/'
+                            'replay_info/events',
+                            self.map_id[0], '.'.join((self.map_id, 'json')))
 
     @property
     def csv_path(self):
@@ -287,6 +303,14 @@ class ClusteringData(object):
         self.path = path
         self.label_map = label_map
         self._raw_data = None
+
+    @property
+    def name(self):
+        return os.path.basename(self.path).split('.', 1)[0]
+
+    @property
+    def confidence(self):
+        return self.raw_data['confidence']
 
     @property
     def raw_data(self):
@@ -340,6 +364,19 @@ class ClusteringLabelMap(object):
 class ClusteringDataDir(object):
     def __init__(self, path):
         self.path = path
+        self._unit_popularity = None
+
+    @property
+    def clusterings_dir(self):
+        return os.path.join(self.path, 'clusterings')
+
+    def all_clustering_data(self):
+        clusterings = []
+        for path in glob.glob("%s/**/*.json" % self.clusterings_dir,
+                            recursive=True):
+            name = os.path.basename(path).split('.', 1)[0]
+            clusterings.append(self.clustering_data(name))
+        return clusterings
 
     def clustering_data(self, name):
         label_map = ClusteringLabelMap(
@@ -349,8 +386,7 @@ class ClusteringDataDir(object):
                          '.'.join(('cluster_tags', 'json')))
         )
 
-        return ClusteringData(os.path.join(self.path,
-                                           'clusterings',
+        return ClusteringData(os.path.join(self.clusterings_dir,
                                            '.'.join((name, 'json'))),
                               label_map)
 
@@ -358,3 +394,21 @@ class ClusteringDataDir(object):
     def replays_info(self):
         return ReplaysInfoCache(os.path.join(self.path, 'replay_info',
                                              'metadata'))
+
+    @property
+    def replay_events_dir(self):
+        return os.path.join(self.path, 'replay_info', 'events')
+
+    @property
+    def unit_popularity(self):
+        if self._unit_popularity is None:
+            popularity_path = os.path.join(self.path, 'replay_info',
+                                           'unit_popularity.json')
+            with open(popularity_path, 'rb') as fh:
+                bpopularity = msgpack.unpack(fh)
+            self._unit_popularity = {}
+            for bunit, popularity in bpopularity:
+                unit = Unit(bunit[0].decode('utf-8'),
+                            bunit[1].decode('utf-8'))
+                self._unit_popularity[unit] = popularity
+        return self._unit_popularity

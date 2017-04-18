@@ -14,6 +14,7 @@ from sklearn.preprocessing import scale
 from sklearn.cluster import AffinityPropagation
 
 from replay_processing import model
+from replay_processing.model import Unit, BuildItem
 
 def parse_args(args):
     parser = argparse.ArgumentParser()
@@ -27,17 +28,16 @@ def parse_args(args):
                         help="Seconds to stop considering data.",
                         type=int,
                         default=0)
+    parser.add_argument("--affinity-between",
+                         help="Two player@map_ids separated by comma to "
+                              "compute affinity between",
+                         type=str)
 
     return parser.parse_args(args)
 
 
-Unit = collections.namedtuple('Unit', ['type', 'name'])
-
-
-BuildItem = collections.namedtuple('BuildItem', ['ev_ndx', 'time', 'unit'])
-
-
 class PlayerBuild(object):
+
     def __init__(self, player_id, map_id, map_player):
         self.player_id = player_id
         self.map_id = map_id
@@ -87,6 +87,35 @@ class PlayerBuild(object):
     def units(self):
         return self.unit_counts.keys()
 
+    def load_events_file(self, events_path, ev_time_cutoff):
+        with open(events_path, 'rb') as events_file:
+            events = msgpack.unpack(events_file)
+
+            for ev_ndx, event in enumerate(events):
+                try:
+                    ev_time = event[1]
+                    unit_name = event[3].decode('utf-8')
+                    ev_player_id = event[2] - 1
+                    unit_type = event[0].decode('utf-8')
+                except (ValueError, TypeError, IndexError):
+                    print('Invalid row in %s' % events_path)
+                    continue
+                else:
+                    if (ev_player_id == self.map_player and
+                        unit_name not in model.IGNORE_UNITS and
+                        ev_time > 0 and
+                        (ev_time_cutoff == 0 or ev_time <= ev_time_cutoff)):
+                        if unit_type != 'upgrade':
+                             unit_type = event[4].decode('utf-8')
+                        unit = Unit(unit_type, unit_name)
+                        if (unit.type == 'worker' or
+                            unit.name.startswith('Changeling') or
+                            unit.name.startswith('Shape') or
+                            unit.name.startswith('Reward')):
+                            continue
+                        build_item = BuildItem(ev_ndx, ev_time, unit)
+                        self.add_build_item(build_item)
+
     def add_build_item(self, item):
         heapq.heappush(self._items, item)
 
@@ -132,7 +161,7 @@ class PlayerBuild(object):
                 
             if closest != None:
                 used_events.add(closest)
-                ev_score = 1 / max(1, closest_dist / 600)
+                ev_score = 1 / max(1, closest_dist / 420)
                 if pdb and ev_score != 1:
                     import pdb;pdb.set_trace()
                 score += ev_score
@@ -159,6 +188,9 @@ class PlayerBuild(object):
             other_cur_events = other_unit_events.get(unit, [])
 
             weight = unit_popularity.get(unit, 1)
+            if unit.type == 'building' or unit.type =='upgrade':
+                weight /= 10
+            weight = log(weight)
             unit_score = self.unit_events_affinity(cur_events,
                                                    other_cur_events)
 
@@ -183,6 +215,12 @@ class PlayerBuilds(object):
     def __init__(self):
         self._builds = {}
 
+    def build_from_events_file(self, map_player, events_path, ev_time_cutoff):
+        map_id = os.path.basename(events_path).split('.')[0]
+        build = self.next_build(map_id, map_player)
+        build.load_events_file(events_path, ev_time_cutoff)
+        return build
+
     def next_build(self, map_id, map_player):
         next_id = len(self._builds)
         next_build = PlayerBuild(next_id, map_id, map_player)
@@ -201,8 +239,8 @@ class PlayerBuilds(object):
     def unit_build_popularity_counts(self):
         counts = {}
         for build_id, build in self._builds.items():
-            for unit in build.units:
-                counts[unit] = counts.get(unit, 0) + 1
+            for unit, count in build.unit_counts.items():
+                counts[unit] = counts.get(unit, 0) + count
         return counts
 
 
@@ -214,42 +252,37 @@ def main():
     events_dir = os.path.join(args.clustering_dir, 'replay_info', 'events')
     clustering_dir = model.ClusteringDataDir(args.clustering_dir)
     replays_info = clustering_dir.replays_info
+    ev_cutoff = int(args.time_cutoff)
+    unit_popularity = clustering_dir.unit_popularity
+
+    if args.affinity_between:
+        map1, map2 = args.affinity_between.split(',')
+        player_1, map_1 = map1.split('@')
+        player_2, map_2 = map2.split('@')
+        player_1 = int(player_1) - 1
+        player_2 = int(player_2) - 1
+        events_1 = os.path.join(events_dir, map_1[0], '.'.join((map_1, 'json')))
+        events_2 = os.path.join(events_dir, map_2[0], '.'.join((map_2, 'json')))
+        build_1 = builds.build_from_events_file(player_1, events_1, ev_cutoff)
+        build_2 = builds.build_from_events_file(player_2, events_2, ev_cutoff)
+        affinity = build_1.unit_type_ratios(build_2, unit_popularity)
+        print("Affinity: %f" % affinity)
+        return
 
     print("Loading builds...",)
     for path in glob.glob('%s/**/*.json' % events_dir, recursive=True):
         with open(path, 'rb') as events_file:
-            events = msgpack.unpack(events_file)
             map_path = os.path.basename(path).split('.')[0]
             replay_info = replays_info.replay(map_path)
-            if replay_info.seconds < 600:
+            if args.time_cutoff != 0 and replay_info.seconds < args.time_cutoff:
                 print("Replay %s too short %d seconds" % (map_path,
                                                           replay_info.seconds))
                 continue
-            players = (builds.next_build(map_path, 0),
-                       builds.next_build(map_path, 1))
-            for ev_ndx, event in enumerate(events):
-                if event[3].decode('utf-8') in model.IGNORE_UNITS:
-                    continue
-                ev_time = event[1]
-                if ev_time > 0 and (args.time_cutoff == 0 or ev_time <= int(args.time_cutoff)):
-                    try:
-                        player = players[event[2] - 1]
-                    except (ValueError, TypeError, IndexError):
-                        print('Invalid row in %s' % path)
-                    unit_type = event[0]
-                    if unit_type != b'upgrade':
-                         unit_type = event[4]
-                    unit = Unit(unit_type.decode('utf-8'),
-                                event[3].decode('utf-8'))
-                    if (unit.type == 'worker' or
-                        unit.name.startswith('Changeling') or
-                        unit.name.startswith('Shape')):
-                        continue
-                    build_item = BuildItem(ev_ndx, ev_time, unit)
-                    player.add_build_item(build_item)
+            players = (builds.build_from_events_file(0, path,
+                                                     ev_cutoff),
+                       builds.build_from_events_file(1, path,
+                                                     ev_cutoff))
     print("done")
-
-    unit_popularity = builds.unit_build_popularity_counts()
 
     dist_matrix = np.empty(shape=(len(builds), len(builds)))
 
@@ -284,6 +317,20 @@ def main():
     for i, label in enumerate(ap.labels_):
         builds_by_label[label].append(builds.get_by_player_id(i))
 
+    units_per_label = {}
+    for label, label_builds in builds_by_label.items():
+        unit_counts = collections.defaultdict(int)
+        for build in label_builds:
+            for unit in build.units:
+                unit_counts[unit] += 1
+        units_per_label[label] = sorted(unit_counts.items(),
+                                        key=lambda x: x[1],
+                                        reverse=True)
+
+    label_unit_avgs = {}
+    for label, units in units_per_label.items():
+        labl_unit_avgs[label] = units / len(builds_by_label[label])
+
     with open(args.output_path, 'w') as fh:
         labels_output = {}
         for label, _builds in builds_by_label.items():
@@ -304,20 +351,12 @@ def main():
             }
         output = {
             'labels': labels_output,
-            'confidence': 1
+            'confidence': 1,
+            'labl_unit_avgs': label_unit_avgs
         }
         json.dump(output, fh, indent=4, separators=(',', ': '))
 
 
-    units_per_label = {}
-    for label, label_builds in builds_by_label.items():
-        unit_counts = collections.defaultdict(int)
-        for build in label_builds:
-            for unit in build.units:
-                unit_counts[unit] += 1
-        units_per_label[label] = sorted(unit_counts.items(),
-                                        key=lambda x: x[1],
-                                        reverse=True)
 
     brief_units_per_labels = {}
     for label, units_label in units_per_label.items():

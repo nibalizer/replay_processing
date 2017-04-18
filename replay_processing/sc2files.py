@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import glob
+import json
 import logging
 import sys
 import threading
@@ -42,7 +43,7 @@ def not_one_on_one(parsed_data):
     return parsed_data["game_type"] != "1v1" or len(parsed_data["players"]) != 2
 
 
-def extract_player_data(result, player, logger, debug=False):
+def extract_player_data(filename, result, player, tag_map, logger, debug=False):
     # TODO: what about other types of games?
     opponent = 2 if player == 1 else 1
 
@@ -60,6 +61,8 @@ def extract_player_data(result, player, logger, debug=False):
     data['opponent'] = result['players'][opponent]['name']
     data['player_race'] = result['players'][player]['race']
     data['opponent_race'] = result['players'][opponent]['race']
+    map_hash = os.path.basename(filename).split('.')[0]
+    data['tag'] = tag_map['%s@%s' % (player, map_hash)]
 
     # Winner
     # TODO: Why does this have to be string? Can we refactor this?
@@ -100,13 +103,13 @@ def dump(data, outfile):
     outfile.write("\n")
 
 
-def print_results(result, logger):
+def print_results(filename, result, tag_map, logger):
     # print out a column of data
-    both_data = [extract_player_data(result, k, logger) for k in [1, 2]]
+    both_data = [extract_player_data(filename, result, k, tag_map, logger) for k in [1, 2]]
     return both_data
 
 
-def worker(filename, all_replays, logger):
+def worker(filename, all_replays, tag_map, logger):
     # TODO: This can be set up better
     data = {
         "sides": []
@@ -136,7 +139,7 @@ def worker(filename, all_replays, logger):
         matchup = classify_matchup(parsed)
         logger.debug("Matchup: {0}".format(matchup))
 
-        for player_side in print_results(parsed, logger):
+        for player_side in print_results(filename, parsed, tag_map, logger):
             player_data = {}
             player_data['replay_file'] = filename
             player_data.update(player_side)
@@ -150,7 +153,7 @@ def worker(filename, all_replays, logger):
         return data, num_players, error_replay, korean, map_name, matchup
 
 
-def parse_replays(root_dir, num_threads,
+def parse_replays(root_dir, num_threads, tag_file,
                   logger=logging.getLogger("replayParser"),
                   max_replays=None, all_replays=False,
                   outfile=None):
@@ -168,13 +171,17 @@ def parse_replays(root_dir, num_threads,
     outfile.write(','.join(FIELD_NAMES))
     outfile.write('\n')
 
+    tag_map = None
+    with open(tag_file, 'r') as fh:
+        tag_map = json.load(fh)
+
     with ThreadPoolExecutor(max_workers=num_threads) as executor:
         future_to_replay = {}
         replay_files = glob.glob("{root_dir}/**/*.SC2Replay".format(root_dir=root_dir), recursive=True)
         replay_files = replay_files[:max_replays] if max_replays is not None else replay_files
         for filename in replay_files:
             # mark each future with the replay filename
-            future_to_replay[executor.submit(worker, filename, all_replays, logger)] = filename
+            future_to_replay[executor.submit(worker, filename, all_replays, tag_map, logger)] = filename
 
         for future in as_completed(future_to_replay):
             r_file = future_to_replay[future]

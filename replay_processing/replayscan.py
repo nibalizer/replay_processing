@@ -17,6 +17,7 @@ def main():
             output_file = open(output_path, "w+")
         ret = parse_replays(params["replay_dir"],
                             params["threads"],
+                            tag_file=params.get("tag_file"),
                             max_replays=params.get("max_replays"),
                             logger=logger,
                             outfile=output_file)

@@ -44,6 +44,7 @@ def parse_params():
     parser.add_argument("-a", "--all_matches", help="Only take into account 1v1 matchups", action="store_true")
     parser.add_argument("-o", "--output_path", type=str,
                         help="Destination to output CSV. Default is stdout.")
+    parser.add_argument("-t", "--tag-file", type=str)
 
     tmp = parser.parse_args()
     args["verbose"], args["logger"] = verbose_check(tmp)
@@ -57,7 +58,7 @@ def parse_params():
         args["logger"].critical(err)
         exit(errno.EINVAL)
 
-    for arg in ('max_replays', 'output_path'):
+    for arg in ('max_replays', 'output_path', 'tag_file'):
         if hasattr(tmp, arg):
             args[arg] = getattr(tmp, arg)
 
